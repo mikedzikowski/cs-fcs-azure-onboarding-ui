@@ -140,7 +140,9 @@ resource roleAssignments 'Microsoft.Authorization/roleAssignments@2022-04-01' = 
 `scanningPrincipalId`.)
 
 So the value must be **the Object ID of the CrowdStrike enterprise application (service
-principal)** in the customer tenant:
+principal)** in the customer tenant. That application comes from the **Falcon onboarding wizard** (Azure
+registration + admin consent in the Falcon console). Neither the form nor the Bicep creates it, so
+the wizard must run first:
 
 | ID on the app | Use it? | Why |
 |---|---|---|

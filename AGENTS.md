@@ -21,8 +21,9 @@ run `az stack ...`" flow.
   * **Deploy to Azure button**: the compiled JSON in `deploy/` served from raw GitHub, opened with
     `https://portal.azure.com/#view/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/<enc template>/uiFormDefinitionUri/<enc form>`.
     This URL format isn't in Microsoft's Deploy-to-Azure docs (Microsoft sample repos use it).
-    The documented `#create/Microsoft.Template/uri/<enc template>` link works too but shows a plain
-    parameter list with no checks. The button needs ARM JSON; it can't load remote Bicep.
+    The documented `#create/Microsoft.Template/uri/<enc template>` link would skip the form and its
+    checks, so the repo deliberately doesn't offer it.
+    The button needs ARM JSON; it can't load remote Bicep.
 
 Two scopes, kept at parity: **subscription** and **management group / tenant root**.
 

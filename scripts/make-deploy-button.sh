@@ -14,7 +14,8 @@
 #
 #   2. WITHOUT a form (the only format Microsoft's deploy-button article documents):
 #        https://portal.azure.com/#create/Microsoft.Template/uri/<encoded template URL>
-#      The portal builds a generic parameter page from the template. No prerequisite checks.
+#      The portal builds a generic parameter page from the template. No prerequisite checks,
+#      so this script doesn't generate it.
 #
 # The button only works if every referenced file is publicly readable (raw GitHub URL on a
 # public repo, or a blob URL with a read-only SAS). Anything referenced here becomes public:
@@ -113,13 +114,7 @@ button() {  # button LABEL TEMPLATE_FILE FORM_FILE
   t="$(enc "$(url "$2")")"; f="$(enc "$(url "$3")")"
   echo "### $1"
   echo
-  echo "With the Prerequisites form:"
-  echo
   echo "[![Deploy to Azure](https://aka.ms/deploytoazurebutton)]($PORTAL/#view/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/$t/uiFormDefinitionUri/$f)"
-  echo
-  echo "Template only (generic parameter page, no prerequisite checks):"
-  echo
-  echo "[![Deploy to Azure](https://aka.ms/deploytoazurebutton)]($PORTAL/#create/Microsoft.Template/uri/$t)"
   echo
 }
 

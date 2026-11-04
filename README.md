@@ -20,6 +20,31 @@ What gets deployed:
 
 The deployment stack owns every resource the engine creates, so updates and teardown are clean.
 
+## Before you start: run the Falcon onboarding wizard first
+
+This form **does not create the CrowdStrike enterprise application**. It deploys the Azure side
+only and assigns roles to an application that must already exist in your Entra ID tenant. Neither
+the form nor CrowdStrike's Bicep creates an app registration, a service principal or admin
+consent; the engine only takes the principal's Object ID (`azurePrincipalId`) and assigns roles to it.
+
+Do these in the Falcon console first (they match prerequisites 1 and 2 of CrowdStrike's Bicep
+README in `crowdstrike-fcs-azure-bicep-generated/README.md`):
+
+1. **Create the Azure registration in the Falcon onboarding wizard and grant admin consent** to the
+   Falcon Cloud Security app. Consent is what creates the CrowdStrike **enterprise application**
+   (`cs-app-…`) in your tenant.
+   [US-1](https://falcon.crowdstrike.com/cloud-security/registration-v2/azure) ·
+   [US-2](https://falcon.us-2.crowdstrike.com/cloud-security/registration-v2/azure) ·
+   [EU-1](https://falcon.eu-1.crowdstrike.com/cloud-security/registration-v2/azure)
+2. **Create a Falcon API client** with the `Cloud security Azure registration (Write)` scope. It's
+   needed when real-time visibility, DSPM or vulnerability scanning is enabled.
+3. Copy the enterprise application's **Object ID** (Entra ID → Enterprise applications →
+   `cs-app-…` → Overview) and paste it on the form's **Scope** tab.
+
+If the enterprise application is deleted and consent is granted again, it gets a **new Object
+ID**. Use the current one, or the roles go to a principal that no longer exists. See
+[Which ID the template expects](docs/prereq-checker.md).
+
 ## The prerequisite checker
 
 Without the checker, a missing provider or role only shows up partway through the deployment, as
@@ -113,7 +138,7 @@ then runs `az ts create` with `--ui-form-definition`. The portal asks *"Do you t
 authors' code?"* because the form makes ARM calls. Choose **Yes**, or you get a generic form
 without the checks.
 
-### Option B: Deploy to Azure button (prototype, not yet click-tested)
+### Option B: Deploy to Azure button (form loads from GitHub at both scopes; Create not yet run from a button)
 
 > **Status: pending click-testing.** Nobody has clicked these buttons yet. They point at the
 > `main` branch for the initial testing phase, and they can't work until the files in `deploy/`
@@ -219,6 +244,39 @@ enter those values in the form at deploy time; none of them are defaults in the 
 
 The forms contain the Falcon API host names but no Falcon IP addresses; users enter those on the
 Features tab.
+
+## Updating an existing deployment (new settings, or adding DSPM later)
+
+Open the same form again (Template Spec or button), deploy it to the **same scope**, and click
+**Create**. The wrapper creates the stack with a fixed name, so the same name means Azure
+**updates** the existing stack in place rather than creating a second one:
+
+* subscription: `<prefix>crowdstrike-falcon-<env><suffix>` (e.g. `crowdstrike-falcon-prod`)
+* management group: `<prefix>crowdstrike-falcon-mg-<env><suffix>` (e.g. `crowdstrike-falcon-mg-prod`)
+
+So keep **Environment**, **Resource name prefix** and **Resource name suffix** (Advanced tab)
+the same as the first run. Change them and you get a new, separate stack.
+
+Things to know:
+
+* **Every run describes the whole desired state.** The form doesn't load the current
+  settings, so re-enter everything: Object ID, Falcon cloud, features, Event Hub choice, Falcon IP
+  addresses and API credentials. To add DSPM, tick DSPM *and* keep the features already on.
+* **Removing a feature detaches its resources; it doesn't delete them.** The wrapper's
+  `stackActionOnUnmanage` defaults to `detachAll`, and the form doesn't change it. Resources that
+  leave the stack stay in Azure, unmanaged, until you delete them. (The Azure portal has no
+  built-in way to update a stack: Microsoft lists it as not implemented. Re-running this form is the
+  portal route.)
+* **Untick Initial registration** (Advanced tab) when the tenant is already registered in Falcon.
+  With real-time visibility on, the engine's callback script calls Falcon's
+  `…/registrations/partial/v1` when the box is ticked and `…/registrations/v1` when it's unticked.
+  In testing, two runs with the box ticked on an already-registered tenant failed with 409
+  ("Registration status invalid"). A run after deleting the stack succeeded with it ticked. The
+  exact rule isn't confirmed with CrowdStrike yet.
+* **Use the same region as the first run.** A different region can fail with
+  `InvalidDeploymentLocation`, because the engine's nested deployment names are reused.
+* From the CLI, the equivalent is CrowdStrike's own `az stack sub|mg create` with the existing stack
+  name (see the bundle README). It also prompts before overwriting.
 
 ## Repository layout
 

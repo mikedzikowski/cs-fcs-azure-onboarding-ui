@@ -88,6 +88,12 @@ Publish a new version number for each change so links to earlier versions keep w
   * The Falcon IP addresses are a user-entered, comma-separated field (shown and required with
     real-time visibility), like `falcon_ip_addresses` in CrowdStrike's Terraform module, with a
     link to the docs page for the selected Falcon cloud.
+* The form **doesn't create the CrowdStrike enterprise application**. The customer must first run
+  the Falcon onboarding wizard (create the Azure registration and grant admin consent), which
+  creates `cs-app-…` in their tenant. The engine only assigns roles to `azurePrincipalId`.
+* **Updates** re-run the same form at the same scope with the same env/prefix/suffix, which gives
+  the same stack name and an in-place update. The form doesn't prefill current settings, and
+  `stackActionOnUnmanage` defaults to `detachAll`: dropped features leave detached resources behind.
 * `azurePrincipalId` must be the CrowdStrike **enterprise application Object ID** (the engine
   assigns roles with `principalType: 'ServicePrincipal'`), not the Application ID.
 

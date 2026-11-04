@@ -173,29 +173,17 @@ Those forms use the same building blocks this checker uses (`ResourceScope`, `Ar
 # Copy build output into deploy/ under stable names and scan it for IDs that must not go public
 scripts/make-deploy-button.sh --stage
 
-# Print the Markdown (both scopes; with-form and template-only variants)
+# Print the button Markdown for both scopes
 scripts/make-deploy-button.sh https://raw.githubusercontent.com/mikedzikowski/cs-fcs-azure-onboarding-ui/main/deploy
 ```
 
 #### Subscription scope
 
-With the Prerequisites form (Form view):
-
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#view/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmikedzikowski%2Fcs-fcs-azure-onboarding-ui%2Fmain%2Fdeploy%2FstackWrapper.subscription.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fmikedzikowski%2Fcs-fcs-azure-onboarding-ui%2Fmain%2Fdeploy%2FuiFormDefinition.subscription.json)
-
-Without the prerequisite form (parameters only):
-
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmikedzikowski%2Fcs-fcs-azure-onboarding-ui%2Fmain%2Fdeploy%2FstackWrapper.subscription.json)
 
 #### Management-group scope
 
-With the Prerequisites form (Form view):
-
 [![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#view/Microsoft_Azure_CreateUIDef/CustomDeploymentBlade/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmikedzikowski%2Fcs-fcs-azure-onboarding-ui%2Fmain%2Fdeploy%2FstackWrapper.managementGroup.json/uiFormDefinitionUri/https%3A%2F%2Fraw.githubusercontent.com%2Fmikedzikowski%2Fcs-fcs-azure-onboarding-ui%2Fmain%2Fdeploy%2FuiFormDefinition.managementGroup.json)
-
-Without the prerequisite form (parameters only):
-
-[![Deploy to Azure](https://aka.ms/deploytoazurebutton)](https://portal.azure.com/#create/Microsoft.Template/uri/https%3A%2F%2Fraw.githubusercontent.com%2Fmikedzikowski%2Fcs-fcs-azure-onboarding-ui%2Fmain%2Fdeploy%2FstackWrapper.managementGroup.json)
 
 #### Filling in the form
 

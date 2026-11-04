@@ -1,0 +1,836 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/0.1.2-preview/CreateUIDefinition.MultiVm.json#",
+  "handler": "Microsoft.Azure.CreateUIDef",
+  "version": "0.1.2-preview",
+  "parameters": {
+    "config": {
+      "isWizard": true,
+      "basics": {
+        "description": "Prerequisite check for CrowdStrike Falcon Cloud Security. Select the subscription and region; this page verifies the required resource providers and your permissions. You can't continue until every check passes.",
+        "subscription": {
+          "constraints": {
+            "validations": [
+              {
+                "isValid": "[and(and(not(empty(basics('rpManagement').registrationState)), not(empty(basics('rpContainerInstance').registrationState)), not(empty(basics('rpStorage').registrationState)), not(empty(basics('rpResources').registrationState)), not(empty(basics('rpInsights').registrationState)), not(empty(basics('rpPolicyInsights').registrationState)), not(empty(basics('rpEventHub').registrationState))), not(or(and(not(empty(basics('rpManagement').registrationState)), not(equals(basics('rpManagement').registrationState, 'Registered'))), and(not(empty(basics('rpContainerInstance').registrationState)), not(equals(basics('rpContainerInstance').registrationState, 'Registered'))), and(not(empty(basics('rpStorage').registrationState)), not(equals(basics('rpStorage').registrationState, 'Registered'))), and(not(empty(basics('rpResources').registrationState)), not(equals(basics('rpResources').registrationState, 'Registered'))), and(not(empty(basics('rpInsights').registrationState)), not(equals(basics('rpInsights').registrationState, 'Registered'))), and(not(empty(basics('rpPolicyInsights').registrationState)), not(equals(basics('rpPolicyInsights').registrationState, 'Registered'))), and(not(empty(basics('rpEventHub').registrationState)), not(equals(basics('rpEventHub').registrationState, 'Registered'))))))]",
+                "message": "Required resource providers are missing (or still being checked) in this subscription. See the resource provider message below."
+              },
+              {
+                "isValid": "[contains(coalesce(basics('gaCheck'), parse('{}')), 'value')]",
+                "message": "Global Administrator is required (or is still being checked). See the Global Administrator message below."
+              },
+              {
+                "isValid": "[and(not(empty(basics('permDeploySub').value)), not(empty(filter(basics('permDeploySub').value, (p) => and(contains(p.actions, 'Microsoft.Authorization/*'), contains(p.actions, '*/read'))))))]",
+                "message": "User Access Administrator is required on this subscription (or is still being checked). See the message below."
+              },
+              {
+                "isValid": "[and(not(empty(basics('permDeploySub').value)), not(empty(filter(basics('permDeploySub').value, (p) => and(contains(p.actions, '*'), empty(p.notActions))))))]",
+                "message": "Owner is required on this subscription (or is still being checked). See the Owner message below."
+              },
+              {
+                "isValid": "[and(not(empty(basics('permDeploySub').value)), not(empty(filter(basics('permDeploySub').value, (p) => contains(p.actions, 'Microsoft.Resources/deploymentStacks/*')))))]",
+                "message": "Azure Deployment Stack Owner is required on this subscription (or is still being checked). See the message below."
+              }
+            ]
+          }
+        },
+        "location": {
+          "label": "Region",
+          "toolTip": "Azure region for global resources such as role definitions and event hubs.",
+          "allowedValues": [
+            "eastus",
+            "eastus2",
+            "westus",
+            "westus2",
+            "westus3",
+            "centralus",
+            "southcentralus",
+            "westeurope",
+            "northeurope",
+            "uksouth",
+            "australiaeast",
+            "southeastasia",
+            "japaneast"
+          ],
+          "visible": true
+        }
+      }
+    },
+    "basics": [
+      {
+        "name": "rpManagement",
+        "type": "Microsoft.Solutions.ArmApiControl",
+        "request": {
+          "method": "GET",
+          "path": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Management?api-version=2021-04-01')]"
+        }
+      },
+      {
+        "name": "rpContainerInstance",
+        "type": "Microsoft.Solutions.ArmApiControl",
+        "request": {
+          "method": "GET",
+          "path": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.ContainerInstance?api-version=2021-04-01')]"
+        }
+      },
+      {
+        "name": "rpStorage",
+        "type": "Microsoft.Solutions.ArmApiControl",
+        "request": {
+          "method": "GET",
+          "path": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Storage?api-version=2021-04-01')]"
+        }
+      },
+      {
+        "name": "rpResources",
+        "type": "Microsoft.Solutions.ArmApiControl",
+        "request": {
+          "method": "GET",
+          "path": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Resources?api-version=2021-04-01')]"
+        }
+      },
+      {
+        "name": "rpInsights",
+        "type": "Microsoft.Solutions.ArmApiControl",
+        "request": {
+          "method": "GET",
+          "path": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.Insights?api-version=2021-04-01')]"
+        }
+      },
+      {
+        "name": "rpPolicyInsights",
+        "type": "Microsoft.Solutions.ArmApiControl",
+        "request": {
+          "method": "GET",
+          "path": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.PolicyInsights?api-version=2021-04-01')]"
+        }
+      },
+      {
+        "name": "rpEventHub",
+        "type": "Microsoft.Solutions.ArmApiControl",
+        "request": {
+          "method": "GET",
+          "path": "[concat('/subscriptions/', subscription().subscriptionId, '/providers/Microsoft.EventHub?api-version=2021-04-01')]"
+        }
+      },
+      {
+        "name": "rpCheckPending",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": "[and(not(and(not(empty(basics('rpManagement').registrationState)), not(empty(basics('rpContainerInstance').registrationState)), not(empty(basics('rpStorage').registrationState)), not(empty(basics('rpResources').registrationState)), not(empty(basics('rpInsights').registrationState)), not(empty(basics('rpPolicyInsights').registrationState)), not(empty(basics('rpEventHub').registrationState)))), not(or(and(not(empty(basics('rpManagement').registrationState)), not(equals(basics('rpManagement').registrationState, 'Registered'))), and(not(empty(basics('rpContainerInstance').registrationState)), not(equals(basics('rpContainerInstance').registrationState, 'Registered'))), and(not(empty(basics('rpStorage').registrationState)), not(equals(basics('rpStorage').registrationState, 'Registered'))), and(not(empty(basics('rpResources').registrationState)), not(equals(basics('rpResources').registrationState, 'Registered'))), and(not(empty(basics('rpInsights').registrationState)), not(equals(basics('rpInsights').registrationState, 'Registered'))), and(not(empty(basics('rpPolicyInsights').registrationState)), not(equals(basics('rpPolicyInsights').registrationState, 'Registered'))), and(not(empty(basics('rpEventHub').registrationState)), not(equals(basics('rpEventHub').registrationState, 'Registered'))))))]",
+        "options": {
+          "text": "Checking resource provider registration in the deployment subscription... If this message does not clear, the check could not run - verify manually with: az provider show --namespace <namespace> --query registrationState",
+          "icon": "Info"
+        }
+      },
+      {
+        "name": "rpCheckPassed",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": "[and(and(not(empty(basics('rpManagement').registrationState)), not(empty(basics('rpContainerInstance').registrationState)), not(empty(basics('rpStorage').registrationState)), not(empty(basics('rpResources').registrationState)), not(empty(basics('rpInsights').registrationState)), not(empty(basics('rpPolicyInsights').registrationState)), not(empty(basics('rpEventHub').registrationState))), not(or(and(not(empty(basics('rpManagement').registrationState)), not(equals(basics('rpManagement').registrationState, 'Registered'))), and(not(empty(basics('rpContainerInstance').registrationState)), not(equals(basics('rpContainerInstance').registrationState, 'Registered'))), and(not(empty(basics('rpStorage').registrationState)), not(equals(basics('rpStorage').registrationState, 'Registered'))), and(not(empty(basics('rpResources').registrationState)), not(equals(basics('rpResources').registrationState, 'Registered'))), and(not(empty(basics('rpInsights').registrationState)), not(equals(basics('rpInsights').registrationState, 'Registered'))), and(not(empty(basics('rpPolicyInsights').registrationState)), not(equals(basics('rpPolicyInsights').registrationState, 'Registered'))), and(not(empty(basics('rpEventHub').registrationState)), not(equals(basics('rpEventHub').registrationState, 'Registered'))))))]",
+        "options": {
+          "text": "All resource providers enabled - every required resource provider is registered in the deployment subscription.",
+          "icon": "Info"
+        }
+      },
+      {
+        "name": "rpCheckMissing",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": "[or(and(not(empty(basics('rpManagement').registrationState)), not(equals(basics('rpManagement').registrationState, 'Registered'))), and(not(empty(basics('rpContainerInstance').registrationState)), not(equals(basics('rpContainerInstance').registrationState, 'Registered'))), and(not(empty(basics('rpStorage').registrationState)), not(equals(basics('rpStorage').registrationState, 'Registered'))), and(not(empty(basics('rpResources').registrationState)), not(equals(basics('rpResources').registrationState, 'Registered'))), and(not(empty(basics('rpInsights').registrationState)), not(equals(basics('rpInsights').registrationState, 'Registered'))), and(not(empty(basics('rpPolicyInsights').registrationState)), not(equals(basics('rpPolicyInsights').registrationState, 'Registered'))), and(not(empty(basics('rpEventHub').registrationState)), not(equals(basics('rpEventHub').registrationState, 'Registered'))))]",
+        "options": {
+          "text": "[concat('Missing resource providers - please enable them in the deployment subscription before deploying, or the deployment stack will fail:  ', if(and(not(empty(basics('rpManagement').registrationState)), not(equals(basics('rpManagement').registrationState, 'Registered'))), concat('Microsoft.Management (', basics('rpManagement').registrationState, ')  '), ''), if(and(not(empty(basics('rpContainerInstance').registrationState)), not(equals(basics('rpContainerInstance').registrationState, 'Registered'))), concat('Microsoft.ContainerInstance (', basics('rpContainerInstance').registrationState, ')  '), ''), if(and(not(empty(basics('rpStorage').registrationState)), not(equals(basics('rpStorage').registrationState, 'Registered'))), concat('Microsoft.Storage (', basics('rpStorage').registrationState, ')  '), ''), if(and(not(empty(basics('rpResources').registrationState)), not(equals(basics('rpResources').registrationState, 'Registered'))), concat('Microsoft.Resources (', basics('rpResources').registrationState, ')  '), ''), if(and(not(empty(basics('rpInsights').registrationState)), not(equals(basics('rpInsights').registrationState, 'Registered'))), concat('Microsoft.Insights (', basics('rpInsights').registrationState, ')  '), ''), if(and(not(empty(basics('rpPolicyInsights').registrationState)), not(equals(basics('rpPolicyInsights').registrationState, 'Registered'))), concat('Microsoft.PolicyInsights (', basics('rpPolicyInsights').registrationState, ')  '), ''), if(and(not(empty(basics('rpEventHub').registrationState)), not(equals(basics('rpEventHub').registrationState, 'Registered'))), concat('Microsoft.EventHub (', basics('rpEventHub').registrationState, ')  '), ''), ' Register each with: az provider register --namespace <namespace> --subscription ', subscription().subscriptionId, ' --wait   then reload this form.')]",
+          "uri": "https://learn.microsoft.com/azure/azure-resource-manager/management/resource-providers-and-types#register-resource-provider",
+          "icon": "Error"
+        }
+      },
+      {
+        "name": "gaCheck",
+        "type": "Microsoft.Solutions.ArmApiControl",
+        "request": {
+          "method": "GET",
+          "path": "/providers/microsoft.aadiam/diagnosticSettings?api-version=2017-04-01"
+        }
+      },
+      {
+        "name": "gaCheckPending",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": "[and(not(contains(coalesce(basics('gaCheck'), parse('{}')), 'value')), not(contains(coalesce(basics('gaCheck'), parse('{}')), 'error')))]",
+        "options": {
+          "text": "Confirming Global Administrator... If this message does not change to 'confirmed' within a few seconds, your account could not read Entra ID diagnostic settings, which requires Global Administrator. Assign or activate the role (PIM), then sign out of the Azure portal, sign back in and reopen this form (role changes can take up to 10 minutes to apply).",
+          "icon": "Warning"
+        }
+      },
+      {
+        "name": "gaCheckPassed",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": "[contains(coalesce(basics('gaCheck'), parse('{}')), 'value')]",
+        "options": {
+          "text": "Global Administrator confirmed (able to read Entra ID diagnostic settings).",
+          "icon": "Info"
+        }
+      },
+      {
+        "name": "gaCheckMissing",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": "[contains(coalesce(basics('gaCheck'), parse('{}')), 'error')]",
+        "options": {
+          "text": "Missing Global Administrator - you need the Global Administrator role in Entra ID to configure Entra ID log export. Assign or activate the role (PIM), then sign out of the Azure portal, sign back in and reopen this form (role changes can take up to 10 minutes to apply).",
+          "uri": "https://learn.microsoft.com/azure/role-based-access-control/role-assignments-portal",
+          "icon": "Error"
+        }
+      },
+      {
+        "name": "permDeploySub",
+        "type": "Microsoft.Solutions.ArmApiControl",
+        "request": {
+          "method": "GET",
+          "path": "[concat(concat('/subscriptions/', subscription().subscriptionId), '/providers/Microsoft.Authorization/permissions?api-version=2022-04-01')]"
+        }
+      },
+      {
+        "name": "depPermPending",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": "[not(not(empty(basics('permDeploySub').value)))]",
+        "options": {
+          "text": "Checking your permissions on the deployment subscription... If this message does not clear, your account may have no access to it.",
+          "icon": "Info"
+        }
+      },
+      {
+        "name": "depUaaPassed",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": "[and(not(empty(basics('permDeploySub').value)), not(empty(filter(basics('permDeploySub').value, (p) => and(contains(p.actions, 'Microsoft.Authorization/*'), contains(p.actions, '*/read'))))))]",
+        "options": {
+          "text": "User Access Administrator confirmed on the deployment subscription.",
+          "icon": "Info"
+        }
+      },
+      {
+        "name": "depUaaMissing",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": "[and(not(empty(basics('permDeploySub').value)), not(not(empty(filter(basics('permDeploySub').value, (p) => and(contains(p.actions, 'Microsoft.Authorization/*'), contains(p.actions, '*/read')))))))]",
+        "options": {
+          "text": "Missing User Access Administrator - assign the User Access Administrator role on the deployment subscription (Owner alone is not enough), or activate it in PIM, then sign out of the Azure portal, sign back in and reopen this form (role changes can take up to 10 minutes to apply).",
+          "uri": "https://learn.microsoft.com/azure/role-based-access-control/role-assignments-portal",
+          "icon": "Error"
+        }
+      },
+      {
+        "name": "depOwnerPassed",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": "[and(not(empty(basics('permDeploySub').value)), not(empty(filter(basics('permDeploySub').value, (p) => and(contains(p.actions, '*'), empty(p.notActions))))))]",
+        "options": {
+          "text": "Owner confirmed on the deployment subscription.",
+          "icon": "Info"
+        }
+      },
+      {
+        "name": "depOwnerMissing",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": "[and(not(empty(basics('permDeploySub').value)), not(not(empty(filter(basics('permDeploySub').value, (p) => and(contains(p.actions, '*'), empty(p.notActions)))))))]",
+        "options": {
+          "text": "Missing Owner - you need Owner on the deployment subscription. Assign Owner (or activate it in PIM), then sign out of the Azure portal, sign back in and reopen this form (role changes can take up to 10 minutes to apply).",
+          "uri": "https://learn.microsoft.com/azure/role-based-access-control/role-assignments-portal",
+          "icon": "Error"
+        }
+      },
+      {
+        "name": "depStackPassed",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": "[and(not(empty(basics('permDeploySub').value)), not(empty(filter(basics('permDeploySub').value, (p) => contains(p.actions, 'Microsoft.Resources/deploymentStacks/*')))))]",
+        "options": {
+          "text": "Azure Deployment Stack Owner confirmed on the deployment subscription.",
+          "icon": "Info"
+        }
+      },
+      {
+        "name": "depStackMissing",
+        "type": "Microsoft.Common.InfoBox",
+        "visible": "[and(not(empty(basics('permDeploySub').value)), not(not(empty(filter(basics('permDeploySub').value, (p) => contains(p.actions, 'Microsoft.Resources/deploymentStacks/*'))))))]",
+        "options": {
+          "text": "Missing Azure Deployment Stack Owner - assign the Azure Deployment Stack Owner role on the deployment subscription (Owner alone is not enough), then sign out of the Azure portal, sign back in and reopen this form (role changes can take up to 10 minutes to apply).",
+          "uri": "https://learn.microsoft.com/azure/azure-resource-manager/bicep/deployment-stacks#deployment-stack-permissions",
+          "icon": "Error"
+        }
+      }
+    ],
+    "steps": [
+      {
+        "name": "scope",
+        "label": "Scope",
+        "elements": [
+          {
+            "name": "spLookup",
+            "type": "Microsoft.Solutions.GraphApiControl",
+            "request": {
+              "method": "GET",
+              "path": "/v1.0/servicePrincipals?$filter=startswith(displayName,'cs-app-')&$select=id,appId,displayName"
+            }
+          },
+          {
+            "name": "azurePrincipalIdInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": true,
+            "options": {
+              "icon": "Info",
+              "text": "Select the CrowdStrike enterprise application that the Falcon onboarding wizard created (Entra ID > Enterprise applications > cs-app-…). Its Object ID is used for the role assignments."
+            }
+          },
+          {
+            "name": "azurePrincipalIdPending",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[not(not(empty(steps('scope').spLookup)))]",
+            "options": {
+              "icon": "Info",
+              "text": "Looking up the CrowdStrike enterprise application in Entra ID…"
+            }
+          },
+          {
+            "name": "azurePrincipalId",
+            "type": "Microsoft.Common.DropDown",
+            "label": "CrowdStrike enterprise application",
+            "toolTip": "The enterprise application (service principal) the Falcon onboarding wizard created in this tenant.",
+            "visible": "[and(not(empty(steps('scope').spLookup)), not(empty(coalesce(steps('scope').spLookup.value, parse('[]')))))]",
+            "constraints": {
+              "required": true,
+              "allowedValues": "[map(coalesce(steps('scope').spLookup.value, parse('[]')), (sp) => parse(concat('{\"label\":\"', sp.displayName, '  (Object ID ', sp.id, ')\",\"value\":\"', sp.id, '\"}')))]"
+            }
+          },
+          {
+            "name": "azurePrincipalIdMissing",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(not(empty(steps('scope').spLookup)), empty(coalesce(steps('scope').spLookup.value, parse('[]'))))]",
+            "options": {
+              "icon": "Error",
+              "text": "No CrowdStrike enterprise application (cs-app-…) was found in this tenant. Run the Falcon onboarding wizard first (Falcon console: create the Azure registration and grant admin consent), then reopen this form."
+            }
+          },
+          {
+            "name": "azurePrincipalIdEcho",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[not(empty(coalesce(steps('scope').azurePrincipalId, '')))]",
+            "options": {
+              "icon": "Info",
+              "text": "[concat('Roles will be assigned to principal ID ', steps('scope').azurePrincipalId, '.')]"
+            }
+          },
+          {
+            "name": "subscriptionIds",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Subscriptions to monitor (comma-separated)",
+            "defaultValue": "",
+            "toolTip": "Optional. Subscription IDs to monitor, separated by commas. Leave blank to monitor only the deployment subscription.",
+            "constraints": {
+              "required": false,
+              "validations": [
+                {
+                  "isValid": "[or(equals(length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(subscription().subscriptionId))))), 0), and(equals(length(coalesce(steps('scope').permMonitored.responses, parse('[]'))), length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(subscription().subscriptionId)))))), empty(map(filter(coalesce(steps('scope').permMonitored.responses, parse('[]')), (r) => not(and(equals(r.httpStatusCode, 200), contains(string(r.content.value), '\"actions\":[\"*\"],\"dataActions\":[],\"notActions\":[]')))), (r) => r.name))))]",
+                  "message": "Owner is required on every subscription to monitor (or is still being checked). See the Owner message below."
+                },
+                {
+                  "isValid": "[not(empty(steps('scope').azurePrincipalId))]",
+                  "message": "Select the CrowdStrike enterprise application above first."
+                }
+              ]
+            }
+          },
+          {
+            "name": "permMonitored",
+            "type": "Microsoft.Solutions.ArmApiControl",
+            "request": {
+              "method": "POST",
+              "path": "/batch?api-version=2020-06-01",
+              "body": {
+                "requests": "[map(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(subscription().subscriptionId)))), (s) => parse(concat('{\"name\":\"', s, '\",\"httpMethod\":\"GET\",\"url\":\"/subscriptions/', s, '/providers/Microsoft.Authorization/permissions?api-version=2022-04-01\"}')))]"
+              }
+            }
+          },
+          {
+            "name": "ownerMonNone",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[equals(length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(subscription().subscriptionId))))), 0)]",
+            "options": {
+              "text": "No additional subscriptions listed - only the deployment subscription will be monitored (Owner was checked on the Prerequisites tab).",
+              "icon": "Info"
+            }
+          },
+          {
+            "name": "ownerMonPending",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(greater(length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(subscription().subscriptionId))))), 0), not(equals(length(coalesce(steps('scope').permMonitored.responses, parse('[]'))), length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(subscription().subscriptionId))))))))]",
+            "options": {
+              "text": "Checking Owner on the subscriptions to monitor... If this message does not clear, the check could not run - it supports up to 20 subscriptions, in this tenant, with no duplicates.",
+              "icon": "Info"
+            }
+          },
+          {
+            "name": "ownerMonPassed",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(greater(length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(subscription().subscriptionId))))), 0), equals(length(coalesce(steps('scope').permMonitored.responses, parse('[]'))), length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(subscription().subscriptionId)))))), empty(map(filter(coalesce(steps('scope').permMonitored.responses, parse('[]')), (r) => not(and(equals(r.httpStatusCode, 200), contains(string(r.content.value), '\"actions\":[\"*\"],\"dataActions\":[],\"notActions\":[]')))), (r) => r.name)))]",
+            "options": {
+              "text": "Owner confirmed on every subscription to monitor.",
+              "icon": "Info"
+            }
+          },
+          {
+            "name": "ownerMonMissing",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[and(greater(length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(subscription().subscriptionId))))), 0), equals(length(coalesce(steps('scope').permMonitored.responses, parse('[]'))), length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(subscription().subscriptionId)))))), not(empty(map(filter(coalesce(steps('scope').permMonitored.responses, parse('[]')), (r) => not(and(equals(r.httpStatusCode, 200), contains(string(r.content.value), '\"actions\":[\"*\"],\"dataActions\":[],\"notActions\":[]')))), (r) => r.name))))]",
+            "options": {
+              "text": "[concat('Missing Owner permissions - you need Owner on every subscription CrowdStrike will monitor. Missing or not accessible on:  ', string(map(filter(coalesce(steps('scope').permMonitored.responses, parse('[]')), (r) => not(and(equals(r.httpStatusCode, 200), contains(string(r.content.value), '\"actions\":[\"*\"],\"dataActions\":[],\"notActions\":[]')))), (r) => r.name)), '  Assign Owner (or activate it in PIM), then sign out of the Azure portal, sign back in and reopen this form (role changes can take up to 10 minutes to apply).')]",
+              "uri": "https://learn.microsoft.com/azure/role-based-access-control/role-assignments-portal",
+              "icon": "Error"
+            }
+          }
+        ]
+      },
+      {
+        "name": "crowdStrikeConfig",
+        "label": "CrowdStrike",
+        "elements": [
+          {
+            "name": "falconApiFqdn",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Falcon API region",
+            "defaultValue": "US-1 (api.crowdstrike.com)",
+            "toolTip": "CrowdStrike Falcon API endpoint.",
+            "constraints": {
+              "allowedValues": [
+                {
+                  "label": "US-1 (api.crowdstrike.com)",
+                  "value": "api.crowdstrike.com"
+                },
+                {
+                  "label": "US-2 (api.us-2.crowdstrike.com)",
+                  "value": "api.us-2.crowdstrike.com"
+                },
+                {
+                  "label": "EU-1 (api.eu-1.crowdstrike.com)",
+                  "value": "api.eu-1.crowdstrike.com"
+                },
+                {
+                  "label": "US-GOV-1 (api.laggar.gcw.crowdstrike.com)",
+                  "value": "api.laggar.gcw.crowdstrike.com"
+                }
+              ],
+              "required": false
+            }
+          },
+          {
+            "name": "accountType",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Azure cloud environment",
+            "defaultValue": "Commercial",
+            "toolTip": "Azure cloud environment type.",
+            "constraints": {
+              "allowedValues": [
+                {
+                  "label": "Commercial",
+                  "value": "commercial"
+                },
+                {
+                  "label": "Government",
+                  "value": "gov"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "name": "features",
+        "label": "Features",
+        "elements": [
+          {
+            "name": "enableRealTimeVisibility",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Enable real-time visibility and detection",
+            "toolTip": "Monitor Azure Activity Logs and Entra ID logs."
+          },
+          {
+            "name": "ehInfo",
+            "type": "Microsoft.Common.InfoBox",
+            "visible": "[steps('features').enableRealTimeVisibility]",
+            "options": {
+              "text": "By default CrowdStrike creates a new Event Hub namespace and hubs. To reuse an existing Event Hub, enable the option below and pick the namespace, hub, and consumer group.",
+              "icon": "Info"
+            }
+          },
+          {
+            "name": "useExistingEventHub",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Use an existing Event Hub",
+            "visible": "[steps('features').enableRealTimeVisibility]",
+            "toolTip": "Reuse an existing Event Hub namespace/instance instead of creating new ones."
+          },
+          {
+            "name": "existingEh",
+            "type": "Microsoft.Common.Section",
+            "label": "Existing Event Hub",
+            "visible": "[and(steps('features').enableRealTimeVisibility, steps('features').useExistingEventHub)]",
+            "elements": [
+              {
+                "name": "ehNamespace",
+                "type": "Microsoft.Solutions.ResourceSelector",
+                "label": "Event Hub namespace",
+                "resourceType": "Microsoft.EventHub/namespaces",
+                "toolTip": "Select the existing Event Hub namespace. Activity and Entra hubs are chosen from within it.",
+                "options": {
+                  "filter": {
+                    "subscription": "all",
+                    "location": "all"
+                  }
+                },
+                "constraints": {
+                  "required": "[steps('features').useExistingEventHub]"
+                }
+              },
+              {
+                "name": "hubsApi",
+                "type": "Microsoft.Solutions.ArmApiControl",
+                "request": {
+                  "method": "GET",
+                  "path": "[concat(coalesce(steps('features').existingEh.ehNamespace.id, ''), '/eventhubs?api-version=2024-01-01')]"
+                },
+                "condition": "[and(steps('features').enableRealTimeVisibility, steps('features').useExistingEventHub, not(empty(steps('features').existingEh.ehNamespace.id)))]"
+              },
+              {
+                "name": "activityHubName",
+                "type": "Microsoft.Common.DropDown",
+                "label": "Activity Log Event Hub",
+                "toolTip": "Event Hub instance that receives Azure Activity Logs.",
+                "constraints": {
+                  "allowedValues": "[map(coalesce(steps('features').existingEh.hubsApi.value, parse('[]')), (item) => parse(concat('{\"label\":\"', item.name, '\",\"value\":\"', item.name, '\"}')))]",
+                  "required": "[steps('features').useExistingEventHub]"
+                }
+              },
+              {
+                "name": "activityCgApi",
+                "type": "Microsoft.Solutions.ArmApiControl",
+                "request": {
+                  "method": "GET",
+                  "path": "[concat(coalesce(steps('features').existingEh.ehNamespace.id, ''), '/eventhubs/', coalesce(steps('features').existingEh.activityHubName, ''), '/consumergroups?api-version=2024-01-01')]"
+                },
+                "condition": "[and(and(steps('features').enableRealTimeVisibility, steps('features').useExistingEventHub, not(empty(steps('features').existingEh.ehNamespace.id))), not(empty(steps('features').existingEh.activityHubName)))]"
+              },
+              {
+                "name": "activityConsumerGroup",
+                "type": "Microsoft.Common.DropDown",
+                "label": "Activity Log consumer group",
+                "defaultValue": "$Default",
+                "toolTip": "Consumer group on the Activity Log Event Hub.",
+                "constraints": {
+                  "allowedValues": "[map(coalesce(steps('features').existingEh.activityCgApi.value, parse('[]')), (item) => parse(concat('{\"label\":\"', item.name, '\",\"value\":\"', item.name, '\"}')))]",
+                  "required": "[steps('features').useExistingEventHub]"
+                }
+              },
+              {
+                "name": "entraHubName",
+                "type": "Microsoft.Common.DropDown",
+                "label": "Entra ID Log Event Hub",
+                "toolTip": "Event Hub instance that receives Entra ID logs (can be the same as Activity).",
+                "constraints": {
+                  "allowedValues": "[map(coalesce(steps('features').existingEh.hubsApi.value, parse('[]')), (item) => parse(concat('{\"label\":\"', item.name, '\",\"value\":\"', item.name, '\"}')))]",
+                  "required": "[steps('features').useExistingEventHub]"
+                }
+              },
+              {
+                "name": "entraCgApi",
+                "type": "Microsoft.Solutions.ArmApiControl",
+                "request": {
+                  "method": "GET",
+                  "path": "[concat(coalesce(steps('features').existingEh.ehNamespace.id, ''), '/eventhubs/', coalesce(steps('features').existingEh.entraHubName, ''), '/consumergroups?api-version=2024-01-01')]"
+                },
+                "condition": "[and(and(steps('features').enableRealTimeVisibility, steps('features').useExistingEventHub, not(empty(steps('features').existingEh.ehNamespace.id))), not(empty(steps('features').existingEh.entraHubName)))]"
+              },
+              {
+                "name": "entraConsumerGroup",
+                "type": "Microsoft.Common.DropDown",
+                "label": "Entra ID Log consumer group",
+                "defaultValue": "$Default",
+                "toolTip": "Consumer group on the Entra ID Log Event Hub.",
+                "constraints": {
+                  "allowedValues": "[map(coalesce(steps('features').existingEh.entraCgApi.value, parse('[]')), (item) => parse(concat('{\"label\":\"', item.name, '\",\"value\":\"', item.name, '\"}')))]",
+                  "required": "[steps('features').useExistingEventHub]"
+                }
+              }
+            ]
+          },
+          {
+            "name": "enableDspm",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Enable Data Security Posture Management (DSPM)",
+            "toolTip": "Data discovery and classification across Azure data stores."
+          },
+          {
+            "name": "enableVulnerabilityScanning",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Enable vulnerability scanning",
+            "toolTip": "Agentless scanning of VMs and container images."
+          },
+          {
+            "name": "scanningSection",
+            "type": "Microsoft.Common.Section",
+            "label": "Scanning configuration",
+            "visible": "[or(steps('features').enableDspm, steps('features').enableVulnerabilityScanning)]",
+            "elements": [
+              {
+                "name": "agentlessScanningLocations",
+                "type": "Microsoft.Common.DropDown",
+                "label": "Scanning regions",
+                "multiselect": true,
+                "toolTip": "Regions where agentless scanning is deployed.",
+                "constraints": {
+                  "allowedValues": [
+                    {
+                      "label": "East US",
+                      "value": "eastus"
+                    },
+                    {
+                      "label": "East US 2",
+                      "value": "eastus2"
+                    },
+                    {
+                      "label": "West US 2",
+                      "value": "westus2"
+                    },
+                    {
+                      "label": "West US 3",
+                      "value": "westus3"
+                    },
+                    {
+                      "label": "West Europe",
+                      "value": "westeurope"
+                    },
+                    {
+                      "label": "North Europe",
+                      "value": "northeurope"
+                    }
+                  ],
+                  "required": true
+                }
+              }
+            ]
+          },
+          {
+            "name": "falconIps",
+            "type": "Microsoft.Common.Section",
+            "label": "Falcon IP addresses",
+            "visible": "[steps('features').enableRealTimeVisibility]",
+            "elements": [
+              {
+                "name": "ipDocsUS1",
+                "type": "Microsoft.Common.InfoBox",
+                "visible": "[equals(steps('crowdStrikeConfig').falconApiFqdn, 'api.crowdstrike.com')]",
+                "options": {
+                  "text": "Enter the Falcon US-1 IP addresses from CrowdStrike's \"Allow CrowdStrike IP addresses\" page (opens the US-1 docs; Falcon login required). The Event Hub firewall denies everything else, so without them real-time visibility receives no logs.",
+                  "uri": "https://docs.crowdstrike.com/access?ft:originId=ibc7ee4c",
+                  "icon": "Info"
+                }
+              },
+              {
+                "name": "ipDocsUS2",
+                "type": "Microsoft.Common.InfoBox",
+                "visible": "[equals(steps('crowdStrikeConfig').falconApiFqdn, 'api.us-2.crowdstrike.com')]",
+                "options": {
+                  "text": "Enter the Falcon US-2 IP addresses from CrowdStrike's \"Allow CrowdStrike IP addresses\" page (opens the US-2 docs; Falcon login required). The Event Hub firewall denies everything else, so without them real-time visibility receives no logs.",
+                  "uri": "https://docs.crowdstrike.com/access?ft:originId=a1f2fdef",
+                  "icon": "Info"
+                }
+              },
+              {
+                "name": "ipDocsEU1",
+                "type": "Microsoft.Common.InfoBox",
+                "visible": "[equals(steps('crowdStrikeConfig').falconApiFqdn, 'api.eu-1.crowdstrike.com')]",
+                "options": {
+                  "text": "Enter the Falcon EU-1 IP addresses from CrowdStrike's \"Allow CrowdStrike IP addresses\" page (opens the EU-1 docs; Falcon login required). The Event Hub firewall denies everything else, so without them real-time visibility receives no logs.",
+                  "uri": "https://docs.crowdstrike.com/access?ft:originId=yf3ab7b3",
+                  "icon": "Info"
+                }
+              },
+              {
+                "name": "ipDocsOther",
+                "type": "Microsoft.Common.InfoBox",
+                "visible": "[not(or(equals(steps('crowdStrikeConfig').falconApiFqdn, 'api.crowdstrike.com'), equals(steps('crowdStrikeConfig').falconApiFqdn, 'api.us-2.crowdstrike.com'), equals(steps('crowdStrikeConfig').falconApiFqdn, 'api.eu-1.crowdstrike.com')))]",
+                "options": {
+                  "text": "Enter the Falcon IP addresses for your Falcon cloud from CrowdStrike's \"Allow CrowdStrike IP addresses\" documentation page (Falcon login required). The Event Hub firewall denies everything else.",
+                  "icon": "Info"
+                }
+              },
+              {
+                "name": "falconIpAddresses",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Falcon IP addresses (comma-separated)",
+                "placeholder": "e.g. 192.0.2.10, 192.0.2.11",
+                "toolTip": "CrowdStrike Falcon IP addresses allowed through the Event Hub firewall.",
+                "constraints": {
+                  "required": "[steps('features').enableRealTimeVisibility]",
+                  "validations": [
+                    {
+                      "regex": "^\\s*(\\d{1,3}\\.){3}\\d{1,3}(/\\d{1,2})?(\\s*,\\s*(\\d{1,3}\\.){3}\\d{1,3}(/\\d{1,2})?)*\\s*$",
+                      "message": "Comma-separated IPv4 addresses (optionally /CIDR), e.g. 192.0.2.10, 192.0.2.11."
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "name": "falconApi",
+            "type": "Microsoft.Common.Section",
+            "label": "Falcon API credentials",
+            "visible": "[or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning)]",
+            "elements": [
+              {
+                "name": "falconApiInfo",
+                "type": "Microsoft.Common.InfoBox",
+                "visible": true,
+                "options": {
+                  "text": "Real-time visibility, DSPM and vulnerability scanning report to Falcon, so a Falcon API client ID and secret are required.",
+                  "icon": "Info"
+                }
+              },
+              {
+                "name": "falconClientId",
+                "type": "Microsoft.Common.TextBox",
+                "label": "Falcon API client ID",
+                "defaultValue": "",
+                "toolTip": "Client ID for the CrowdStrike Falcon API.",
+                "constraints": {
+                  "required": "[or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning)]"
+                }
+              },
+              {
+                "name": "falconClientSecret",
+                "type": "Microsoft.Common.PasswordBox",
+                "label": {
+                  "password": "Falcon API client secret",
+                  "confirmPassword": "Confirm client secret"
+                },
+                "toolTip": "Client secret for the CrowdStrike Falcon API.",
+                "constraints": {
+                  "required": "[or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning)]"
+                },
+                "options": {
+                  "hideConfirmation": false
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "advanced",
+        "label": "Advanced",
+        "elements": [
+          {
+            "name": "env",
+            "type": "Microsoft.Common.DropDown",
+            "label": "Environment",
+            "defaultValue": "Production",
+            "toolTip": "Environment label for naming and tagging.",
+            "constraints": {
+              "allowedValues": [
+                {
+                  "label": "Production",
+                  "value": "prod"
+                },
+                {
+                  "label": "Staging",
+                  "value": "stag"
+                },
+                {
+                  "label": "Development",
+                  "value": "dev"
+                },
+                {
+                  "label": "Test",
+                  "value": "test"
+                }
+              ]
+            }
+          },
+          {
+            "name": "resourceNamePrefix",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Resource name prefix",
+            "defaultValue": "",
+            "toolTip": "Optional prefix (max 10 chars combined with suffix).",
+            "constraints": {
+              "required": false,
+              "validations": [
+                {
+                  "regex": "^[a-zA-Z0-9\\-_]{0,10}$",
+                  "message": "0-10 chars: letters, numbers, hyphens, underscores."
+                }
+              ]
+            }
+          },
+          {
+            "name": "resourceNameSuffix",
+            "type": "Microsoft.Common.TextBox",
+            "label": "Resource name suffix",
+            "defaultValue": "",
+            "toolTip": "Optional suffix (max 10 chars combined with prefix).",
+            "constraints": {
+              "required": false,
+              "validations": [
+                {
+                  "regex": "^[a-zA-Z0-9\\-_]{0,10}$",
+                  "message": "0-10 chars: letters, numbers, hyphens, underscores."
+                }
+              ]
+            }
+          },
+          {
+            "name": "isInitialRegistration",
+            "type": "Microsoft.Common.CheckBox",
+            "label": "Initial registration (uncheck to update an existing integration)",
+            "defaultValue": true
+          }
+        ]
+      }
+    ],
+    "outputs": {
+      "csInfraSubscriptionId": "[subscription().subscriptionId]",
+      "subscriptionIds": "[if(empty(steps('scope').subscriptionIds), parse('[]'), filter(split(replace(steps('scope').subscriptionIds, ' ', ''), ','), (s) => not(empty(s))))]",
+      "location": "[location()]",
+      "azurePrincipalId": "[steps('scope').azurePrincipalId]",
+      "falconApiFqdn": "[steps('crowdStrikeConfig').falconApiFqdn]",
+      "falconClientId": "[if(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('features').falconApi.falconClientId, '')]",
+      "falconClientSecret": "[if(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('features').falconApi.falconClientSecret, '')]",
+      "accountType": "[steps('crowdStrikeConfig').accountType]",
+      "enableRealTimeVisibility": "[steps('features').enableRealTimeVisibility]",
+      "logIngestionSettings": {
+        "activityLogSettings": {
+          "enabled": "[steps('features').enableRealTimeVisibility]",
+          "deployRemediationPolicy": true,
+          "existingEventhub": {
+            "use": "[coalesce(steps('features').useExistingEventHub, false)]",
+            "subscriptionId": "[first(skip(split(coalesce(steps('features').existingEh.ehNamespace.id, '//////'), '/'), 2))]",
+            "resourceGroupName": "[first(skip(split(coalesce(steps('features').existingEh.ehNamespace.id, '//////'), '/'), 4))]",
+            "namespaceName": "[coalesce(steps('features').existingEh.ehNamespace.name, '')]",
+            "name": "[coalesce(steps('features').existingEh.activityHubName, '')]",
+            "consumerGroupName": "[coalesce(steps('features').existingEh.activityConsumerGroup, '')]"
+          }
+        },
+        "entraIdLogSettings": {
+          "enabled": "[steps('features').enableRealTimeVisibility]",
+          "existingEventhub": {
+            "use": "[coalesce(steps('features').useExistingEventHub, false)]",
+            "subscriptionId": "[first(skip(split(coalesce(steps('features').existingEh.ehNamespace.id, '//////'), '/'), 2))]",
+            "resourceGroupName": "[first(skip(split(coalesce(steps('features').existingEh.ehNamespace.id, '//////'), '/'), 4))]",
+            "namespaceName": "[coalesce(steps('features').existingEh.ehNamespace.name, '')]",
+            "name": "[coalesce(steps('features').existingEh.entraHubName, '')]",
+            "consumerGroupName": "[coalesce(steps('features').existingEh.entraConsumerGroup, '')]"
+          }
+        }
+      },
+      "enableDspm": "[steps('features').enableDspm]",
+      "enableVulnerabilityScanning": "[steps('features').enableVulnerabilityScanning]",
+      "agentlessScanningLocations": "[if(or(steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('features').scanningSection.agentlessScanningLocations, parse('[]'))]",
+      "resourceNamePrefix": "[steps('advanced').resourceNamePrefix]",
+      "resourceNameSuffix": "[steps('advanced').resourceNameSuffix]",
+      "env": "[steps('advanced').env]",
+      "isInitialRegistration": "[steps('advanced').isInitialRegistration]",
+      "falconIpAddresses": "[if(steps('features').enableRealTimeVisibility, filter(split(replace(coalesce(steps('features').falconIps.falconIpAddresses, ''), ' ', ''), ','), (s) => not(empty(s))), parse('[]'))]"
+    }
+  }
+}

@@ -22,9 +22,10 @@ __pycache__/
 # Portal screenshots contain real subscription/tenant IDs - keep local
 docs/screenshots/
 
-# internal-only: style sample and the CrowdSpace engineering page (never commit)
+# internal-only: style sample, the CrowdSpace engineering page and console mock-ups (never commit)
 htmlexample/
 crowdspace/
+mock/
 
 # Local env, archives, backups
 .env

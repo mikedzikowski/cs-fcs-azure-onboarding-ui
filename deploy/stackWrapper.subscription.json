@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.46.1.21595",
-      "templateHash": "1936234099332681094"
+      "templateHash": "18134893895226248614"
     },
     "name": "CrowdStrike Falcon - Deployment Stack Wrapper (inline, self-contained)",
     "description": "Creates a Microsoft.Resources/deploymentStacks that deploys the CrowdStrike subscription-scope engine template inline. Used to TEST the stack-creating UI via a Template Spec with no external hosting.",
@@ -140,6 +140,20 @@
       },
       "metadata": {
         "description": "Tags applied to deployed resources."
+      }
+    },
+    "deploymentScriptStorageAccountId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Resource ID of an existing storage account for the engine's deployment scripts (Azure Container Instance) instead of the auto-created one. Must be in csInfraSubscriptionId. Empty = auto-create."
+      }
+    },
+    "deploymentScriptSubnetId": {
+      "type": "string",
+      "defaultValue": "",
+      "metadata": {
+        "description": "Resource ID of a subnet delegated to Microsoft.ContainerInstance/containerGroups (in csInfraSubscriptionId). When set, the script mounts the storage account with its managed identity and no key is passed; when empty, the wrapper looks up the storage account key."
       }
     },
     "logIngestionSettings": {
@@ -7404,7 +7418,9 @@
       }
     },
     "stackName": "cs-subscription-stack",
-    "excludedPrincipals": "[if(empty(parameters('azurePrincipalId')), createArray(), createArray(parameters('azurePrincipalId')))]"
+    "excludedPrincipals": "[if(empty(parameters('azurePrincipalId')), createArray(), createArray(parameters('azurePrincipalId')))]",
+    "useScriptStorage": "[not(empty(parameters('deploymentScriptStorageAccountId')))]",
+    "scriptStorageIdParts": "[split(parameters('deploymentScriptStorageAccountId'), '/')]"
   },
   "resources": [
     {
@@ -7482,6 +7498,9 @@
           },
           "tags": {
             "value": "[parameters('tags')]"
+          },
+          "deploymentScriptSettings": {
+            "value": "[if(not(variables('useScriptStorage')), null(), if(empty(parameters('deploymentScriptSubnetId')), createObject('storageAccountId', parameters('deploymentScriptStorageAccountId'), 'storageAccountKey', listKeys(extensionResourceId(format('/subscriptions/{0}/resourceGroups/{1}', if(variables('useScriptStorage'), variables('scriptStorageIdParts')[2], parameters('csInfraSubscriptionId')), if(variables('useScriptStorage'), variables('scriptStorageIdParts')[4], 'unused')), 'Microsoft.Storage/storageAccounts', if(variables('useScriptStorage'), last(variables('scriptStorageIdParts')), 'unused')), '2023-05-01').keys[0].value), createObject('storageAccountId', parameters('deploymentScriptStorageAccountId'), 'subnetId', parameters('deploymentScriptSubnetId'))))]"
           }
         }
       }

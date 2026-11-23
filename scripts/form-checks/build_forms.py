@@ -134,8 +134,9 @@ NEEDS_CREDS = ("or(steps('features').enableRealTimeVisibility, steps('features')
                "steps('features').enableVulnerabilityScanning)")
 
 
-def shared_tabs(text):
-    """Rebuild the CrowdStrike and Features tabs (and their outputs) identically for both forms."""
+def shared_tabs(text, infra):
+    """Rebuild the CrowdStrike and Features tabs (and their outputs) identically for both forms, and add
+    the deployment script storage option to Advanced. `infra`: the infrastructure subscription ID expression."""
     d = json.loads(text)
     sub = json.load(open(SUB_BASE))
     steps = {s["name"]: s for s in d["view"]["properties"]["steps"]}
@@ -193,6 +194,12 @@ def shared_tabs(text):
     out["falconClientSecret"] = f"[if({NEEDS_CREDS}, steps('features').falconApi.falconClientSecret, '')]"
     out["logIngestionSettings"] = copy.deepcopy(sub["view"]["outputs"]["parameters"]["logIngestionSettings"])
     out["falconIpAddresses"] = checks.falcon_ip_output("features", rtv)
+
+    # Advanced: existing storage account for the engine's deployment scripts. Those scripts only run
+    # when a feature is on (Falcon callback, MG scope resolution), the same rule as the credentials.
+    storage_elems, storage_out = checks.script_storage_section("advanced", infra, NEEDS_CREDS)
+    steps["advanced"]["elements"] += storage_elems
+    out.update(storage_out)
 
     # InfoBox uses options.style (schema); some base boxes still say "icon".
     def fix(o):
@@ -266,7 +273,7 @@ def subscription_form():
         "azurePrincipalId"''',
          '''"location": "[steps('basics').resourceScope.location.name]",
         "azurePrincipalId"'''),
-    ]))
+    ]), infra="steps('basics').resourceScope.subscription.subscriptionId")
 
 
 def management_group_form():
@@ -350,7 +357,7 @@ def management_group_form():
         "azurePrincipalId"''',
          '''"location": "[steps('basics').resourceScope.location.name]",
         "azurePrincipalId"'''),
-    ]))
+    ]), infra=infra)
 
 
 if __name__ == "__main__":

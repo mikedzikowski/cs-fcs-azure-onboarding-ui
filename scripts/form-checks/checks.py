@@ -227,3 +227,83 @@ def falcon_ip_section(step, fqdn, visible):
 def falcon_ip_output(step, visible):
     v = f"steps('{step}').falconIps.falconIpAddresses"
     return f"[if({visible}, filter(split(replace(coalesce({v}, ''), ' ', ''), ','), (s) => not(empty(s))), parse('[]'))]"
+
+
+# Existing storage account for the engine's deployment scripts (engine parameter
+# deploymentScriptSettings). Requirements from CrowdStrike's README ("Storage account requirements
+# for deploymentScriptSettings") and Microsoft's deployment script docs ("Use an existing storage
+# account"): in csInfraSubscriptionId, allowSharedKeyAccess true (unset means true), no firewall
+# rules (networkAcls.defaultAction Allow), a kind that supports file shares. An optional subnet must
+# be in the same subscription and delegated to Microsoft.ContainerInstance/containerGroups.
+SCRIPT_STORAGE_DOCS = "https://github.com/CrowdStrike/azure-bicep-cloud-registration#deployment-fails-because-the-auto-created-deployment-script-storage-account-violates-policy"
+ACI_DELEGATION = "Microsoft.ContainerInstance/containerGroups"
+
+
+def script_storage_section(step, infra, enabled):
+    """Advanced-tab option and section; returns (elements, outputs). `infra` is the infrastructure
+    subscription ID expression, `enabled` when deployment scripts run at all."""
+    on = f"and({enabled}, steps('{step}').useExistingScriptStorage)"
+    s = f"steps('{step}').scriptStorage"
+    sa_id = f"coalesce({s}.storageAccount.id, '')"
+    subnet = f"replace(coalesce({s}.subnetId, ''), ' ', '')"
+    in_infra = lambda rid: f"startsWith(toLower({rid}), toLower(concat('/subscriptions/', {infra}, '/')))"
+    sa = f"{s}.storageApi"
+    sa_loaded = f"not(empty(coalesce({sa}.name, '')))"
+    sa_rules = [
+        (in_infra(sa_id), "The storage account must be in the infrastructure subscription (deployment scripts only accept a storage account from their own subscription)."),
+        (f"or(not({sa_loaded}), not(equals({sa}.properties.allowSharedKeyAccess, false)))",
+         "The storage account has shared key access disabled. Deployment scripts need allowSharedKeyAccess = true, even with a subnet."),
+        (f"or(not({sa_loaded}), not(equals(coalesce({sa}.properties.networkAcls.defaultAction, 'Allow'), 'Deny')))",
+         "The storage account has firewall rules (default action Deny). Deployment scripts don't support storage firewalls; use publicNetworkAccess Disabled instead."),
+        (f"or(not({sa_loaded}), contains(parse('[\"StorageV2\",\"Storage\",\"FileStorage\"]'), {sa}.kind))",
+         "The storage account kind doesn't support Azure file shares. Use StorageV2 (or FileStorage)."),
+    ]
+    sn = f"{s}.subnetApi"
+    sn_loaded = f"not(empty(coalesce({sn}.name, '')))"
+    sn_delegated = f"contains(map(coalesce({sn}.properties.delegations, parse('[]')), (d) => d.properties.serviceName), '{ACI_DELEGATION}')"
+    subnet_rules = [
+        (f"or(empty({subnet}), {in_infra(subnet)})", "The subnet must be in the infrastructure subscription."),
+        (f"or(empty({subnet}), not({sn_loaded}), {sn_delegated})", f"The subnet isn't delegated to {ACI_DELEGATION}."),
+    ]
+    validations = [{"isValid": f"[or(not({on}), {ok})]", "message": msg} for ok, msg in
+                   [(f"not(empty({sa_id}))", "Select a storage account."),
+                    (f"or(empty({sa_id}), {sa_loaded})", "Still reading the storage account (or it couldn't be read).")]
+                   + sa_rules + subnet_rules]
+    elements = [
+        {"name": "useExistingScriptStorage", "type": "Microsoft.Common.CheckBox",
+         "label": "Use an existing storage account for deployment scripts",
+         "visible": f"[{enabled}]",
+         "toolTip": "The CrowdStrike deployment scripts run in an Azure Container Instance and normally create their own storage account with public network access. Use this if a policy blocks that account."},
+        {"name": "scriptStorage", "type": "Microsoft.Common.Section", "label": "Deployment script storage",
+         "visible": f"[{on}]",
+         "elements": [
+             {"name": "scriptStorageInfo", "type": "Microsoft.Common.InfoBox", "visible": True,
+              "options": {"style": "Info", "uri": SCRIPT_STORAGE_DOCS, "text":
+                  "Use a storage account in the infrastructure subscription with shared key access enabled and no firewall rules "
+                  "(public network access can be disabled). If it's only reachable through a private endpoint, also enter a subnet "
+                  f"delegated to {ACI_DELEGATION} so the script runs in that virtual network."}},
+             {"name": "storageAccount", "type": "Microsoft.Solutions.ResourceSelector", "label": "Storage account",
+              "resourceType": "Microsoft.Storage/storageAccounts",
+              "toolTip": "Existing storage account in the infrastructure subscription.",
+              "options": {"filter": {"subscription": "all", "location": "all"}},
+              "constraints": {"required": f"[{on}]"}},
+             {**arm_get("storageApi", f"[concat({sa_id}, '?api-version=2023-05-01')]"),
+              "condition": f"[and({on}, not(empty({sa_id})))]"},
+             {"name": "subnetId", "type": "Microsoft.Common.TextBox", "label": "Subnet resource ID (optional)",
+              "placeholder": "/subscriptions/<id>/resourceGroups/<rg>/providers/Microsoft.Network/virtualNetworks/<vnet>/subnets/<subnet>",
+              "toolTip": f"Optional. A subnet delegated to {ACI_DELEGATION}. With a subnet, the script mounts the storage with its managed identity and no key is passed.",
+              "constraints": {"required": False, "validations": validations}},
+             {**arm_get("subnetApi", f"[concat({subnet}, '?api-version=2024-05-01')]"),
+              "condition": f"[and({on}, not(empty({subnet})))]"},
+             box("scriptStorageKeyWarning", f"and({on}, empty({subnet}))", "Warning",
+                 "Without a subnet, the deployment looks up this storage account's access key and passes it to the CrowdStrike template. "
+                 "The deployment stack stores it in its parameters, readable by anyone who can read the stack. Enter a delegated subnet to avoid passing a key."),
+             box("scriptStorageOk", f"and({on}, not(empty({sa_id})), {sa_loaded}, " + ", ".join(ok for ok, _ in sa_rules + subnet_rules) + ")", "Info",
+                 "Storage account meets the deployment script requirements."),
+         ]},
+    ]
+    outputs = {
+        "deploymentScriptStorageAccountId": f"[if({on}, {sa_id}, '')]",
+        "deploymentScriptSubnetId": f"[if({on}, {subnet}, '')]",
+    }
+    return elements, outputs

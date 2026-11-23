@@ -49,9 +49,15 @@ Sensitive parameters that require secure input methods.
 | **agentlessScanningDeployNatGateway** | bool | 🔵 User | sub/mg | ❌ | `true` | Deploy NAT Gateway for scanning |
 | **agentlessScanningHostSubscriptionId** | string | 🔵 User | sub/mg | ❌ | `''` | Host subscription for cross-account scanning |
 | **agentlessScanningCustomVnetConfiguration** | object | 🔵 User | sub/mg | ❌ | `{}` | Custom VNet subnet configuration |
+| **deploymentScriptStorageAccountId** | string | 🔵 User | sub/mg (wrapper) | ❌ | `''` | Existing storage account for the deployment scripts (Advanced tab). Must be in `csInfraSubscriptionId`. Empty = the script service creates one |
+| **deploymentScriptSubnetId** | string | 🔵 User | sub/mg (wrapper) | ❌ | `''` | Optional subnet delegated to `Microsoft.ContainerInstance/containerGroups`. Set: no key is passed. Empty: the wrapper looks up the storage key (`listKeys`) |
 
 *Required when enableRealTimeVisibility OR enableDspm OR enableVulnerabilityScanning is true  
 **One of agentlessScanningLocations or agentlessScanningLocationsPerSubscription required when scanning enabled
+
+The two `deploymentScript*` parameters belong to the stack wrapper, not the engine. The wrapper turns them into the
+engine's `deploymentScriptSettings` object (`storageAccountId`, plus `subnetId` or a looked-up `storageAccountKey`),
+or `null` when no storage account is chosen.
 
 ## Parameter Validation Rules
 

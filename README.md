@@ -269,6 +269,33 @@ Things to know:
 * From the CLI, the equivalent is CrowdStrike's own `az stack sub|mg create` with the existing stack
   name (see the bundle README). It also prompts before overwriting.
 
+## Using an existing storage account for the deployment scripts
+
+The CrowdStrike template runs deployment scripts (the Falcon callback and, at management-group
+scope, the scope lookup) in an Azure Container Instance. By default the script service creates its
+own storage account with public network access. If a policy blocks that (for example "Storage
+accounts should disable public network access"), tick **Use an existing storage account for
+deployment scripts** on the **Advanced** tab. It appears when real-time visibility, DSPM or
+vulnerability scanning is on, because only those run scripts. This follows CrowdStrike's guidance:
+[Deployment fails because the auto-created deployment script storage account violates policy](https://github.com/CrowdStrike/azure-bicep-cloud-registration#deployment-fails-because-the-auto-created-deployment-script-storage-account-violates-policy).
+
+The form reads the selected storage account and blocks **Next** unless it is:
+
+* in the **infrastructure subscription** (deployment scripts only accept one from their own subscription),
+* `allowSharedKeyAccess` **true** (needed even with a subnet),
+* without firewall rules (`networkAcls.defaultAction` **Allow**; `publicNetworkAccess: Disabled` is fine),
+* a kind with Azure file shares (`StorageV2`, `Storage` or `FileStorage`).
+
+**Subnet (optional).** If the storage account is only reachable through a private endpoint, enter a
+subnet in the infrastructure subscription delegated to `Microsoft.ContainerInstance/containerGroups`.
+The script then runs in that virtual network and mounts the share with its managed identity (the
+template grants it Storage File Data Privileged Contributor), so **no key is passed**.
+
+**Without a subnet**, the wrapper looks up the storage account key (`listKeys`) during deployment.
+The user never types it, but the deployment stack stores it **readable in its parameters**
+(`az stack ... show`), visible to anyone who can read the stack. The form shows this as a warning.
+Use a subnet if that's not acceptable.
+
 ## Repository layout
 
 | Path | What it is |

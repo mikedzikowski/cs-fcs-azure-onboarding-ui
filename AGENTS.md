@@ -81,6 +81,11 @@ Publish a new version number for each change so links to earlier versions keep w
   broke it; non-admins stay amber "Confirming…", never red). Without it, a non-admin fails at deploy
   time on the engine's Entra ID diagnostic setting.
 * Monitored-subscription Owner check uses ARM `/batch` (names required; >20 requests turn async).
+* Existing deployment-script storage (Advanced tab, `checks.script_storage_section`): the wrapper maps
+  `deploymentScriptStorageAccountId` / `deploymentScriptSubnetId` to the engine's
+  `deploymentScriptSettings` (null when unused). No subnet = `listKeys()` in the wrapper, and the stack
+  then stores that key readable in its parameters. Keep the stack's `parameters` a literal object:
+  wrapping it in `union()`/`if()` made preflight fail with "Expected Object but got String".
 * Gate optional lookups with ArmApiControl `condition` (e.g. the existing-Event-Hub lookups), or a
   failing call with empty inputs keeps **Create** disabled.
 * DropDown `defaultValue` must be a **label**, not a value (e.g. `"Production"`, not `"prod"`).

@@ -257,6 +257,7 @@ To try a form without publishing, paste the built JSON into the
 | End-to-end deployment from the form (stack `succeeded`, 12 managed resources, Event Hub firewall limited to the Falcon cloud's IPs) | ✅ deployed 2026-11-02 |
 | Owner check on monitored subscriptions (`/batch`) | ⚠️ not yet tested (`/batch` didn't work for the GA check in the portal) |
 | Management-group form | ⚠️ never published |
+| Existing storage account for deployment scripts (Advanced tab) | ⚠️ form not yet opened in the portal. Wrapper: ARM preflight passes at both scopes with the option off, key path and subnet path. A test stack ran a deployment script on an existing storage account with a `listKeys` key (2026-11-23). Not yet run through the full CrowdStrike engine |
 
 ## 8. Known limits
 
@@ -268,6 +269,11 @@ To try a form without publishing, paste the built JSON into the
   duplicates** (ARM `/batch` limits).
 * **Re-checks need a reload.** Forms don't poll, so after fixing something the user reloads the
   form, or signs out and in for role changes.
+* **Deployment script storage key is stored in the stack.** Without a subnet, the wrapper looks up
+  the storage account key and passes it in the engine's `deploymentScriptSettings` object. A
+  deployment stack keeps a secure value nested in an object readable in its parameters (seen in a
+  test stack; a top-level secure parameter such as the Falcon client secret is hidden). The form
+  warns about it; a delegated subnet avoids passing a key.
 * **Region.** A redeploy must use the region of any existing deployment records with the same
   names. ARM rejects reusing a deployment name in a different location (`InvalidDeploymentLocation`).
 

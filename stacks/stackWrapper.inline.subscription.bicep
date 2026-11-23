@@ -78,6 +78,12 @@ param tags object = {
   CSTagVendor: 'CrowdStrike'
 }
 
+@description('Resource ID of an existing storage account for the engine\'s deployment scripts (Azure Container Instance) instead of the auto-created one. Must be in csInfraSubscriptionId. Empty = auto-create.')
+param deploymentScriptStorageAccountId string = ''
+
+@description('Resource ID of a subnet delegated to Microsoft.ContainerInstance/containerGroups (in csInfraSubscriptionId). When set, the script mounts the storage account with its managed identity and no key is passed; when empty, the wrapper looks up the storage account key.')
+param deploymentScriptSubnetId string = ''
+
 @description('Log ingestion settings, including optional use of an existing Event Hub for Activity and/or Entra ID logs.')
 param logIngestionSettings object = {
   activityLogSettings: {
@@ -121,6 +127,27 @@ var stackName = 'cs-subscription-stack'
 // CrowdStrike's SP must stay unblocked so it can operate even under a deny lock.
 var excludedPrincipals = empty(azurePrincipalId) ? [] : [azurePrincipalId]
 
+// deploymentScriptSettings for the engine (CrowdStrike README: "Deployment fails because the
+// auto-created deployment script storage account violates policy"). Without a subnet, Azure
+// Container Instances can only mount the share with a key, so it is looked up here rather than
+// typed into the form. Note: a deployment stack stores it readable in the stack's parameters.
+var useScriptStorage = !empty(deploymentScriptStorageAccountId)
+var scriptStorageIdParts = split(deploymentScriptStorageAccountId, '/')
+
+// An existing reference deploys nothing; listKeys() below only runs on the no-subnet branch.
+resource scriptStorage 'Microsoft.Storage/storageAccounts@2023-05-01' existing = {
+  name: useScriptStorage ? last(scriptStorageIdParts) : 'unused'
+  scope: resourceGroup(useScriptStorage ? scriptStorageIdParts[2] : csInfraSubscriptionId, useScriptStorage ? scriptStorageIdParts[4] : 'unused')
+}
+
+// null (the engine's default) unless a storage account is chosen. Keep `parameters` a literal
+// object: preflight doesn't run listKeys(), so an expression around the whole block fails validation.
+var deploymentScriptSettings = !useScriptStorage
+  ? null
+  : (empty(deploymentScriptSubnetId)
+      ? { storageAccountId: deploymentScriptStorageAccountId, storageAccountKey: scriptStorage.listKeys().keys[0].value }
+      : { storageAccountId: deploymentScriptStorageAccountId, subnetId: deploymentScriptSubnetId })
+
 resource crowdStrikeStack 'Microsoft.Resources/deploymentStacks@2025-07-01' = {
   name: stackName
   location: location
@@ -158,6 +185,7 @@ resource crowdStrikeStack 'Microsoft.Resources/deploymentStacks@2025-07-01' = {
       isInitialRegistration: { value: isInitialRegistration }
       logIngestionSettings: { value: logIngestionSettings }
       tags: { value: tags }
+      deploymentScriptSettings: { value: deploymentScriptSettings }
     }
   }
 }

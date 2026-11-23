@@ -777,6 +777,127 @@
               "type": "Microsoft.Common.CheckBox",
               "label": "Initial registration (uncheck to update an existing integration)",
               "defaultValue": true
+            },
+            {
+              "name": "useExistingScriptStorage",
+              "type": "Microsoft.Common.CheckBox",
+              "label": "Use an existing storage account for deployment scripts",
+              "visible": "[or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning)]",
+              "toolTip": "The CrowdStrike deployment scripts run in an Azure Container Instance and normally create their own storage account with public network access. Use this if a policy blocks that account."
+            },
+            {
+              "name": "scriptStorage",
+              "type": "Microsoft.Common.Section",
+              "label": "Deployment script storage",
+              "visible": "[and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)]",
+              "elements": [
+                {
+                  "name": "scriptStorageInfo",
+                  "type": "Microsoft.Common.InfoBox",
+                  "visible": true,
+                  "options": {
+                    "style": "Info",
+                    "uri": "https://github.com/CrowdStrike/azure-bicep-cloud-registration#deployment-fails-because-the-auto-created-deployment-script-storage-account-violates-policy",
+                    "text": "Use a storage account in the infrastructure subscription with shared key access enabled and no firewall rules (public network access can be disabled). If it's only reachable through a private endpoint, also enter a subnet delegated to Microsoft.ContainerInstance/containerGroups so the script runs in that virtual network."
+                  }
+                },
+                {
+                  "name": "storageAccount",
+                  "type": "Microsoft.Solutions.ResourceSelector",
+                  "label": "Storage account",
+                  "resourceType": "Microsoft.Storage/storageAccounts",
+                  "toolTip": "Existing storage account in the infrastructure subscription.",
+                  "options": {
+                    "filter": {
+                      "subscription": "all",
+                      "location": "all"
+                    }
+                  },
+                  "constraints": {
+                    "required": "[and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)]"
+                  }
+                },
+                {
+                  "name": "storageApi",
+                  "type": "Microsoft.Solutions.ArmApiControl",
+                  "request": {
+                    "method": "GET",
+                    "path": "[concat(coalesce(steps('advanced').scriptStorage.storageAccount.id, ''), '?api-version=2023-05-01')]"
+                  },
+                  "condition": "[and(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), not(empty(coalesce(steps('advanced').scriptStorage.storageAccount.id, ''))))]"
+                },
+                {
+                  "name": "subnetId",
+                  "type": "Microsoft.Common.TextBox",
+                  "label": "Subnet resource ID (optional)",
+                  "placeholder": "/subscriptions/<id>/resourceGroups/<rg>/providers/Microsoft.Network/virtualNetworks/<vnet>/subnets/<subnet>",
+                  "toolTip": "Optional. A subnet delegated to Microsoft.ContainerInstance/containerGroups. With a subnet, the script mounts the storage with its managed identity and no key is passed.",
+                  "constraints": {
+                    "required": false,
+                    "validations": [
+                      {
+                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), not(empty(coalesce(steps('advanced').scriptStorage.storageAccount.id, ''))))]",
+                        "message": "Select a storage account."
+                      },
+                      {
+                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(empty(coalesce(steps('advanced').scriptStorage.storageAccount.id, '')), not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))))]",
+                        "message": "Still reading the storage account (or it couldn't be read)."
+                      },
+                      {
+                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), startsWith(toLower(coalesce(steps('advanced').scriptStorage.storageAccount.id, '')), toLower(concat('/subscriptions/', steps('basics').csInfraSubscription.subscriptionId, '/'))))]",
+                        "message": "The storage account must be in the infrastructure subscription (deployment scripts only accept a storage account from their own subscription)."
+                      },
+                      {
+                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(steps('advanced').scriptStorage.storageApi.properties.allowSharedKeyAccess, false))))]",
+                        "message": "The storage account has shared key access disabled. Deployment scripts need allowSharedKeyAccess = true, even with a subnet."
+                      },
+                      {
+                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(coalesce(steps('advanced').scriptStorage.storageApi.properties.networkAcls.defaultAction, 'Allow'), 'Deny'))))]",
+                        "message": "The storage account has firewall rules (default action Deny). Deployment scripts don't support storage firewalls; use publicNetworkAccess Disabled instead."
+                      },
+                      {
+                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), contains(parse('[\"StorageV2\",\"Storage\",\"FileStorage\"]'), steps('advanced').scriptStorage.storageApi.kind)))]",
+                        "message": "The storage account kind doesn't support Azure file shares. Use StorageV2 (or FileStorage)."
+                      },
+                      {
+                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), startsWith(toLower(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), toLower(concat('/subscriptions/', steps('basics').csInfraSubscription.subscriptionId, '/')))))]",
+                        "message": "The subnet must be in the infrastructure subscription."
+                      },
+                      {
+                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), not(not(empty(coalesce(steps('advanced').scriptStorage.subnetApi.name, '')))), contains(map(coalesce(steps('advanced').scriptStorage.subnetApi.properties.delegations, parse('[]')), (d) => d.properties.serviceName), 'Microsoft.ContainerInstance/containerGroups')))]",
+                        "message": "The subnet isn't delegated to Microsoft.ContainerInstance/containerGroups."
+                      }
+                    ]
+                  }
+                },
+                {
+                  "name": "subnetApi",
+                  "type": "Microsoft.Solutions.ArmApiControl",
+                  "request": {
+                    "method": "GET",
+                    "path": "[concat(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', ''), '?api-version=2024-05-01')]"
+                  },
+                  "condition": "[and(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), not(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', ''))))]"
+                },
+                {
+                  "name": "scriptStorageKeyWarning",
+                  "type": "Microsoft.Common.InfoBox",
+                  "visible": "[and(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')))]",
+                  "options": {
+                    "style": "Warning",
+                    "text": "Without a subnet, the deployment looks up this storage account's access key and passes it to the CrowdStrike template. The deployment stack stores it in its parameters, readable by anyone who can read the stack. Enter a delegated subnet to avoid passing a key."
+                  }
+                },
+                {
+                  "name": "scriptStorageOk",
+                  "type": "Microsoft.Common.InfoBox",
+                  "visible": "[and(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), not(empty(coalesce(steps('advanced').scriptStorage.storageAccount.id, ''))), not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, ''))), startsWith(toLower(coalesce(steps('advanced').scriptStorage.storageAccount.id, '')), toLower(concat('/subscriptions/', steps('basics').csInfraSubscription.subscriptionId, '/'))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(steps('advanced').scriptStorage.storageApi.properties.allowSharedKeyAccess, false))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(coalesce(steps('advanced').scriptStorage.storageApi.properties.networkAcls.defaultAction, 'Allow'), 'Deny'))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), contains(parse('[\"StorageV2\",\"Storage\",\"FileStorage\"]'), steps('advanced').scriptStorage.storageApi.kind)), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), startsWith(toLower(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), toLower(concat('/subscriptions/', steps('basics').csInfraSubscription.subscriptionId, '/')))), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), not(not(empty(coalesce(steps('advanced').scriptStorage.subnetApi.name, '')))), contains(map(coalesce(steps('advanced').scriptStorage.subnetApi.properties.delegations, parse('[]')), (d) => d.properties.serviceName), 'Microsoft.ContainerInstance/containerGroups')))]",
+                  "options": {
+                    "style": "Info",
+                    "text": "Storage account meets the deployment script requirements."
+                  }
+                }
+              ]
             }
           ]
         }
@@ -829,7 +950,9 @@
             }
           }
         },
-        "falconIpAddresses": "[if(steps('features').enableRealTimeVisibility, filter(split(replace(coalesce(steps('features').falconIps.falconIpAddresses, ''), ' ', ''), ','), (s) => not(empty(s))), parse('[]'))]"
+        "falconIpAddresses": "[if(steps('features').enableRealTimeVisibility, filter(split(replace(coalesce(steps('features').falconIps.falconIpAddresses, ''), ' ', ''), ','), (s) => not(empty(s))), parse('[]'))]",
+        "deploymentScriptStorageAccountId": "[if(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), coalesce(steps('advanced').scriptStorage.storageAccount.id, ''), '')]",
+        "deploymentScriptSubnetId": "[if(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', ''), '')]"
       }
     }
   }

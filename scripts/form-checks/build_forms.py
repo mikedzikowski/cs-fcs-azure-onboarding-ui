@@ -219,7 +219,6 @@ def subscription_form():
     where = "deployment subscription"
 
     rp_elems, rp_ok = checks.providers("basics", sub, where)
-    ga_elems, ga_ok = checks.global_admin("basics")
     perm_elems, perm = checks.permissions("basics", "permDeploySub", f"concat('/subscriptions/', {sub})", where, "dep")
     mon_elems, mon_ok = checks.monitored_owner("scope", "steps('scope').subscriptionIds", sub)
 
@@ -230,7 +229,6 @@ def subscription_form():
             "subscription": {"constraints": {"validations": [
                 {"isValid": f"[{ok}]", "message": msg} for ok, msg in [
                     (rp_ok, "Required resource providers are missing (or still being checked) in this subscription. See the resource provider message below."),
-                    (ga_ok, "Global Administrator is required (or is still being checked). See the Global Administrator message below."),
                     (perm["uaa"], "User Access Administrator is required on this subscription (or is still being checked). See the message below."),
                     (perm["owner"], "Owner is required on this subscription (or is still being checked). See the Owner message below."),
                     (perm["stack"], "Azure Deployment Stack Owner is required on this subscription (or is still being checked). See the message below."),
@@ -242,7 +240,7 @@ def subscription_form():
             },
         }),
         f.edited("intro", text="Prerequisite check for CrowdStrike Falcon Cloud Security. Select the subscription and region the deployment runs in; this page then verifies the required resource providers and your permissions. You cannot continue until every check passes."),
-    ] + dumps(rp_elems + ga_elems + perm_elems)
+    ] + dumps(rp_elems + perm_elems)
 
     scope = principal_id(f) + [
         f.edited("subscriptionIds", validations=[
@@ -280,7 +278,6 @@ def management_group_form():
     mg = "last(split(coalesce(steps('basics').resourceScope.managementGroup.id, ''), '/'))"
     infra = "steps('basics').csInfraSubscription.subscriptionId"
 
-    ga_elems, ga_ok = checks.global_admin("basics")
     # Owner on the management group is inherited by every subscription under it, so it
     # covers all monitored subscriptions without a per-subscription call.
     mg_perm_elems, mg_perm = checks.permissions(
@@ -313,7 +310,6 @@ def management_group_form():
             "constraints": {"validations": [
                 {"isValid": f"[{ok}]", "message": msg} for ok, msg in [
                     (f"not(empty({mg}))", "Select a management group above."),
-                    (ga_ok, "Global Administrator is required (or is still being checked). See the Global Administrator message below."),
                     (mg_perm["uaa"], "User Access Administrator is required on the management group (or is still being checked). See the message below."),
                     (mg_perm["owner"], "Owner is required on the management group (or is still being checked). See the Owner message below."),
                     (mg_perm["stack"], "Azure Deployment Stack Owner is required on the management group (or is still being checked). See the message below."),
@@ -321,7 +317,7 @@ def management_group_form():
                     (infra_perm["owner"], "Owner is required on the infrastructure subscription (or is still being checked). See the Owner message below."),
                 ]]},
         }),
-    ] + dumps(ga_elems + mg_perm_elems + rp_elems + infra_perm_elems)
+    ] + dumps(mg_perm_elems + rp_elems + infra_perm_elems)
 
     # Subscriptions outside the selected management group can be added (the engine's
     # subscriptionIds), with the same Owner check as the subscription form.

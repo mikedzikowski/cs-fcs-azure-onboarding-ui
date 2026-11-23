@@ -66,7 +66,8 @@ def providers(step, sub, where):
 def global_admin(step):
     """Global Administrator, inferred from reading tenant-level Entra ID diagnostic settings
     (the resource the template needs that role for). Plain GET: the /batch variant did not
-    return a usable result inside the portal."""
+    return a usable result inside the portal.
+    Not used by build_forms.py (removed from both forms); kept so it can be re-added."""
     out = f"coalesce(steps('{step}').gaCheck, parse('{{}}'))"
     ok = f"contains({out}, 'value')"
     denied = f"contains({out}, 'error')"

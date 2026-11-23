@@ -78,7 +78,6 @@ All checks run against the **deployment subscription** selected on the Prerequis
 | Check | API call (as the user) | Passes when | Why it's required |
 |---|---|---|---|
 | Resource providers | `GET /subscriptions/{id}/providers/{namespace}` × 7 | every `registrationState` is `Registered` | ARM doesn't auto-register providers for resources it creates indirectly (deployment scripts create a container instance and storage account). CrowdStrike's registration guide lists them as prerequisites. |
-| Global Administrator | `GET /providers/microsoft.aadiam/diagnosticSettings` | the response has a `value` | The template creates an Entra ID diagnostic setting. CrowdStrike's guide requires Global Administrator (or Security Administrator) for that. |
 | User Access Administrator | `GET /subscriptions/{id}/providers/Microsoft.Authorization/permissions` | an entry contains both `Microsoft.Authorization/*` and `*/read` | Customer requirement: the role must be assigned itself. Owner doesn't count. |
 | Owner | same call as above | an entry has `actions: ["*"]` with no `notActions` | CrowdStrike's guide requires Owner on the deployment scope. |
 | Azure Deployment Stack Owner | same call as above | an entry contains `Microsoft.Resources/deploymentStacks/*` | CrowdStrike's guide requires this role on the stack's scope, assigned separately. Owner alone isn't enough. |
@@ -110,12 +109,16 @@ tenant root, which every subscription inherits, so it passes the UAA check.
 
 A custom role that copies one of these action lists would also pass.
 
-### Why Global Administrator is inferred
+### Global Administrator isn't checked
 
-Entra ID roles live in Microsoft Graph, and forms can't call Graph. The check reads the tenant's
-Entra ID diagnostic settings instead. That's the same resource the template later writes, and
-the same permission boundary CrowdStrike's requirement is about. It's an inference, not a role
-lookup.
+The forms used to infer Global Administrator by reading the tenant's Entra ID diagnostic settings
+(`GET /providers/microsoft.aadiam/diagnosticSettings`; forms can't call Microsoft Graph). That
+check was removed. The builder, `checks.global_admin()`, is still in `checks.py`, unused.
+
+What it guarded still applies: with real-time visibility on, the engine creates a tenant-level
+Entra ID diagnostic setting (`modules/log-ingestion/entraLog.bicep`), and CrowdStrike's guide
+requires Global Administrator or Security Administrator for that. A user without such a role now
+passes the form and the deployment fails on that resource.
 
 ### Which ID the template expects for the CrowdStrike app
 
@@ -250,17 +253,15 @@ To try a form without publishing, paste the built JSON into the
 | UAA check: passes only with the UAA role (after sign-out/in) | ✅ seen in the portal |
 | Owner check | ✅ seen in the portal |
 | Stack Owner check: red without the role, green after assigning it | ✅ seen in the portal |
-| Global Administrator check passes for a GA | ✅ seen in the portal |
 | Next / Review + create blocked while any check fails | ✅ seen in the portal |
 | End-to-end deployment from the form (stack `succeeded`, 12 managed resources, Event Hub firewall limited to the Falcon cloud's IPs) | ✅ deployed 2026-11-02 |
-| Global Administrator check for a **non-GA** user | ✅ seen in the portal: the amber "Confirming Global Administrator…" box stays up and Next is blocked. The red "Missing Global Administrator" box never appears, because a denied lookup doesn't return an `error` the form can read |
 | Owner check on monitored subscriptions (`/batch`) | ⚠️ not yet tested (`/batch` didn't work for the GA check in the portal) |
 | Management-group form | ⚠️ never published |
 
 ## 8. Known limits
 
-* **Global Administrator is inferred** (section 3). Roles that can read Entra ID diagnostic
-  settings may also pass. CrowdStrike accepts Security Administrator for this step.
+* **Global Administrator isn't checked** (section 3). Without an Entra ID admin role the
+  deployment fails at the Entra ID diagnostic setting rather than on the Prerequisites tab.
 * **Only the deployment subscription is checked for providers.** CrowdStrike's guide needs
   Microsoft.Insights in every registered subscription.
 * **The monitored-subscription check is limited to one tenant, at most 20 subscriptions, no

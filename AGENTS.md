@@ -76,9 +76,10 @@ Publish a new version number for each change so links to earlier versions keep w
   UAA = actions contain `Microsoft.Authorization/*` and `*/read`; Owner = `*` with no notActions;
   Deployment Stack Owner = `Microsoft.Resources/deploymentStacks/*`. **Owner does not imply the
   other two**; each is checked separately (verified by removing roles from a test account).
-* Global Administrator is inferred from a plain `GET /providers/microsoft.aadiam/diagnosticSettings`
-  (no Graph from forms). Don't route it through `/batch` (that broke it). For non-admins it stays
-  amber "Confirming…" rather than red; Next is still blocked.
+* There is **no Global Administrator check** (removed on request). `checks.global_admin()` is kept
+  unused: a plain `GET /providers/microsoft.aadiam/diagnosticSettings` (no Graph from forms; `/batch`
+  broke it; non-admins stay amber "Confirming…", never red). Without it, a non-admin fails at deploy
+  time on the engine's Entra ID diagnostic setting.
 * Monitored-subscription Owner check uses ARM `/batch` (names required; >20 requests turn async).
 * Gate optional lookups with ArmApiControl `condition` (e.g. the existing-Event-Hub lookups), or a
   failing call with empty inputs keeps **Create** disabled.

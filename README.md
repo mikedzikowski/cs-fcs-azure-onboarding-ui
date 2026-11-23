@@ -64,22 +64,23 @@ A form can't run code. The checker uses only what the portal gives a form:
 | Check | How | Passes when |
 |---|---|---|
 | Resource providers | `GET /subscriptions/{id}/providers/{ns}`, once per provider: Microsoft.Management, ContainerInstance, Storage, Resources, Insights, PolicyInsights, EventHub | every provider is `Registered` |
-| Global Administrator (**inferred**) | `GET /providers/microsoft.aadiam/diagnosticSettings` | the user can read Entra ID diagnostic settings |
 | User Access Administrator | `GET .../providers/Microsoft.Authorization/permissions` | an entry has both `Microsoft.Authorization/*` and `*/read` |
 | Owner | same call | an entry has `*` and no `notActions` |
 | Azure Deployment Stack Owner | same call | an entry has `Microsoft.Resources/deploymentStacks/*` |
 | Owner on monitored subscriptions (Scope tab) | one ARM `/batch` call across the "Subscriptions to monitor" list | Owner on each one (**not yet tested in the portal**) |
 
 Each role is detected by an action list that only its built-in definition has. Owner alone
-**doesn't** pass the User Access Administrator or Deployment Stack Owner checks. Forms can't call
-Microsoft Graph, so Global Administrator is inferred: the check reads the same Entra ID resource
-the template later writes. It isn't a role lookup.
+**doesn't** pass the User Access Administrator or Deployment Stack Owner checks.
+
+The form **doesn't check Global Administrator**. With real-time visibility on, the engine creates a
+tenant-level Entra ID diagnostic setting, which needs an Entra ID admin role (CrowdStrike's guide:
+Global Administrator or Security Administrator). A user without one passes the form and the
+deployment fails on that setting.
 
 ### Management-group variant (tested at Tenant Root Group via Template Spec)
 
 The management-group form runs the same kinds of checks against different scopes:
 
-* Global Administrator, as above.
 * User Access Administrator, Owner, and Azure Deployment Stack Owner on the selected management
   group.
 * Resource providers and Owner on the **infrastructure subscription**.
@@ -91,9 +92,10 @@ All of its blocking rules are on the infrastructure-subscription picker.
 These screenshots come from the subscription-scope Template Spec in a lab tenant.
 Subscription IDs are redacted.
 
-**All checks passing.** Every result box is blue: resource providers registered, Global
-Administrator confirmed, and User Access Administrator, Owner, and Azure Deployment Stack Owner
-confirmed on the deployment subscription. **Next** is available.
+**All checks passing.** Every result box is blue: resource providers registered, and User Access
+Administrator, Owner, and Azure Deployment Stack Owner confirmed on the deployment subscription.
+**Next** is available. (These screenshots predate removing the Global Administrator check, so they
+still show its box.)
 
 ![All prerequisite checks passing](docs/images/prereq-check-all-passed.png)
 
@@ -104,9 +106,8 @@ assign before signing out and back in.
 
 ![Missing provider and Deployment Stack Owner](docs/images/prereq-check-failures.png)
 
-**A user with only Reader and no Entra ID admin role.** Providers pass. The Global Administrator
-box stays amber ("Confirming…") because a denied lookup returns nothing the form can read.
-User Access Administrator, Owner, and Stack Owner are all reported missing. The portal's own
+**A user with only Reader and no Entra ID admin role.** Providers pass. User Access
+Administrator, Owner, and Stack Owner are all reported missing. The portal's own
 check also reports the missing `Microsoft.Resources/deployments/validate/action` permission.
 
 ![Non-admin user: every permission check failing](docs/images/prereq-check-nonadmin-user.png)

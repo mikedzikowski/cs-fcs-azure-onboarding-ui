@@ -114,8 +114,8 @@ param stackActionOnUnmanage string = 'detachAll'
 param stackDenySettingsMode string = 'none'
 
 /* ---- Derived ---- */
-var environment = length(env) > 0 ? '-${env}' : env
-var stackName = '${resourceNamePrefix}crowdstrike-falcon-mg${environment}${resourceNameSuffix}'
+// Fixed name used by CrowdStrike's deprovisioning steps (az stack mg delete --name cs-managementgroup-stack).
+var stackName = 'cs-managementgroup-stack'
 var excludedPrincipals = empty(azurePrincipalId) ? [] : [azurePrincipalId]
 
 resource crowdStrikeStack 'Microsoft.Resources/deploymentStacks@2025-07-01' = {

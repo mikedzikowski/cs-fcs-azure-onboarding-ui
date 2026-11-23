@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.46.1.21595",
-      "templateHash": "3427071830272089060"
+      "templateHash": "1936234099332681094"
     },
     "name": "CrowdStrike Falcon - Deployment Stack Wrapper (inline, self-contained)",
     "description": "Creates a Microsoft.Resources/deploymentStacks that deploys the CrowdStrike subscription-scope engine template inline. Used to TEST the stack-creating UI via a Template Spec with no external hosting.",
@@ -7403,8 +7403,7 @@
         }
       }
     },
-    "environment": "[if(greater(length(parameters('env')), 0), format('-{0}', parameters('env')), parameters('env'))]",
-    "stackName": "[format('{0}crowdstrike-falcon{1}{2}', parameters('resourceNamePrefix'), variables('environment'), parameters('resourceNameSuffix'))]",
+    "stackName": "cs-subscription-stack",
     "excludedPrincipals": "[if(empty(parameters('azurePrincipalId')), createArray(), createArray(parameters('azurePrincipalId')))]"
   },
   "resources": [

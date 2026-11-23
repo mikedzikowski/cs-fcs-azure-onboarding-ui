@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.46.1.21595",
-      "templateHash": "18122822462826137721"
+      "templateHash": "5625269638351167312"
     },
     "name": "CrowdStrike Falcon - Deployment Stack Wrapper (MG scope, inline, self-contained)",
     "description": "Creates a management-group-scoped Microsoft.Resources/deploymentStacks that deploys the CrowdStrike management-group engine template inline. Used to TEST the stack-creating UI via a Template Spec with no external hosting.",
@@ -13758,8 +13758,7 @@
         }
       }
     },
-    "environment": "[if(greater(length(parameters('env')), 0), format('-{0}', parameters('env')), parameters('env'))]",
-    "stackName": "[format('{0}crowdstrike-falcon-mg{1}{2}', parameters('resourceNamePrefix'), variables('environment'), parameters('resourceNameSuffix'))]",
+    "stackName": "cs-managementgroup-stack",
     "excludedPrincipals": "[if(empty(parameters('azurePrincipalId')), createArray(), createArray(parameters('azurePrincipalId')))]"
   },
   "resources": [

@@ -236,14 +236,16 @@ Features tab.
 ## Updating an existing deployment (new settings, or adding DSPM later)
 
 Open the same form again (Template Spec or button), deploy it to the **same scope**, and click
-**Create**. The wrapper creates the stack with a fixed name, so the same name means Azure
-**updates** the existing stack in place rather than creating a second one:
+**Create**. The wrapper always gives the stack the name CrowdStrike's deprovisioning steps use,
+so Azure **updates** the existing stack in place rather than creating a second one:
 
-* subscription: `<prefix>crowdstrike-falcon-<env><suffix>` (e.g. `crowdstrike-falcon-prod`)
-* management group: `<prefix>crowdstrike-falcon-mg-<env><suffix>` (e.g. `crowdstrike-falcon-mg-prod`)
+* subscription: `cs-subscription-stack`
+* management group: `cs-managementgroup-stack`
 
-So keep **Environment**, **Resource name prefix** and **Resource name suffix** (Advanced tab)
-the same as the first run. Change them and you get a new, separate stack.
+There is one stack per scope. Still keep **Environment**, **Resource name prefix** and
+**Resource name suffix** (Advanced tab) the same as the first run: they name the resources
+inside the stack, so changing them replaces those resources (the old ones are detached, not deleted,
+under the default `detachAll`).
 
 Things to know:
 

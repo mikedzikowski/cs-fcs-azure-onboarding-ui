@@ -92,8 +92,12 @@ Publish a new version number for each change so links to earlier versions keep w
 * The form **doesn't create the CrowdStrike enterprise application**. The customer must first run
   the Falcon onboarding wizard (create the Azure registration and grant admin consent), which
   creates `cs-app-…` in their tenant. The engine only assigns roles to `azurePrincipalId`.
-* **Updates** re-run the same form at the same scope with the same env/prefix/suffix, which gives
-  the same stack name and an in-place update. The form doesn't prefill current settings, and
+* The stack name is fixed per scope: `cs-subscription-stack` / `cs-managementgroup-stack`, the
+  names CrowdStrike's deprovisioning steps (`az stack ... delete --name ...`) expect. Don't derive it
+  from env/prefix/suffix.
+* **Updates** re-run the same form at the same scope (same stack name, in-place update) with the
+  same env/prefix/suffix (otherwise the engine's resource names change). The form doesn't
+  prefill current settings, and
   `stackActionOnUnmanage` defaults to `detachAll`: dropped features leave detached resources behind.
 * `azurePrincipalId` must be the CrowdStrike **enterprise application Object ID** (the engine
   assigns roles with `principalType: 'ServicePrincipal'`), not the Application ID.

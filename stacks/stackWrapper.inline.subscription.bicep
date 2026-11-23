@@ -115,8 +115,8 @@ param stackActionOnUnmanage string = 'detachAll'
 param stackDenySettingsMode string = 'none'
 
 /* ---- Derived ---- */
-var environment = length(env) > 0 ? '-${env}' : env
-var stackName = '${resourceNamePrefix}crowdstrike-falcon${environment}${resourceNameSuffix}'
+// Fixed name used by CrowdStrike's deprovisioning steps (az stack sub delete --name cs-subscription-stack).
+var stackName = 'cs-subscription-stack'
 
 // CrowdStrike's SP must stay unblocked so it can operate even under a deny lock.
 var excludedPrincipals = empty(azurePrincipalId) ? [] : [azurePrincipalId]

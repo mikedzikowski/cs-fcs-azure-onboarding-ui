@@ -131,7 +131,12 @@ var excludedPrincipals = empty(azurePrincipalId) ? [] : [azurePrincipalId]
 // auto-created deployment script storage account violates policy"). Without a subnet, Azure
 // Container Instances can only mount the share with a key, so it is looked up here rather than
 // typed into the form. Note: a deployment stack stores it readable in the stack's parameters.
-var useScriptStorage = !empty(deploymentScriptStorageAccountId)
+// Fail early with a clear message for direct CLI use (the form prevents both cases).
+var useScriptStorage = !empty(deploymentScriptSubnetId) && empty(deploymentScriptStorageAccountId)
+  ? fail('deploymentScriptSubnetId is set but deploymentScriptStorageAccountId is empty: a subnet is only used with an existing storage account.')
+  : (!empty(deploymentScriptStorageAccountId) && length(split(deploymentScriptStorageAccountId, '/')) != 9
+      ? fail('deploymentScriptStorageAccountId must be a storage account resource ID: /subscriptions/<id>/resourceGroups/<rg>/providers/Microsoft.Storage/storageAccounts/<name>')
+      : !empty(deploymentScriptStorageAccountId))
 var scriptStorageIdParts = split(deploymentScriptStorageAccountId, '/')
 
 // An existing reference deploys nothing; listKeys() below only runs on the no-subnet branch.

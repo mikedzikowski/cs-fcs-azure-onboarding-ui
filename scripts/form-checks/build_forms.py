@@ -5,7 +5,9 @@ Edit ui/base/*.json (or checks.py), then run:  python3 scripts/form-checks/build
 The create-templatespec-stack*.sh scripts run this before publishing.
 
 Both forms get a first "Prerequisites" tab that checks resource providers and the
-deploying user's permissions, and blocks Next / Review + create until every check passes.
+deploying user's permissions, and blocks Next / Review + create until every check passes
+(or the user ticks "Skip the prerequisite checks" at the bottom of that tab). The subscription
+form also checks Global Administrator; the management-group form doesn't.
 The CrowdStrike service principal object ID (with an InfoBox on which ID to use) and, for
 subscription scope, the subscriptions to monitor move to a second "Scope" tab.
 """
@@ -133,10 +135,20 @@ SUB_BASE = os.path.join(ROOT, "ui/base/uiFormDefinition.templatespec.json")
 NEEDS_CREDS = ("or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, "
                "steps('features').enableVulnerabilityScanning)")
 
+# When the engine runs a deployment script (Azure Container Instance), i.e. when
+# deploymentScriptSettings is used:
+#   subscription scope: only updateRegistration, gated on shouldDeployLogIngestion
+#     (cs-deployment-subscription.bicep: module updateRegistration = if (shouldDeployLogIngestion));
+#   management-group scope: also deploymentScope (resolveDeploymentScope), gated on
+#     shouldResolveDeploymentScope = shouldDeployLogIngestion || shouldDeployScanningEnvironment.
+SCRIPTS_RUN_SUB = "steps('features').enableRealTimeVisibility"
+SCRIPTS_RUN_MG = NEEDS_CREDS
 
-def shared_tabs(text, infra):
+
+def shared_tabs(text, infra, scripts_run):
     """Rebuild the CrowdStrike and Features tabs (and their outputs) identically for both forms, and add
-    the deployment script storage option to Advanced. `infra`: the infrastructure subscription ID expression."""
+    the deployment script storage option to Advanced. `infra`: the infrastructure subscription ID
+    expression; `scripts_run`: when the engine runs deployment scripts at this scope."""
     d = json.loads(text)
     sub = json.load(open(SUB_BASE))
     steps = {s["name"]: s for s in d["view"]["properties"]["steps"]}
@@ -195,9 +207,10 @@ def shared_tabs(text, infra):
     out["logIngestionSettings"] = copy.deepcopy(sub["view"]["outputs"]["parameters"]["logIngestionSettings"])
     out["falconIpAddresses"] = checks.falcon_ip_output("features", rtv)
 
-    # Advanced: existing storage account for the engine's deployment scripts. Those scripts only run
-    # when a feature is on (Falcon callback, MG scope resolution), the same rule as the credentials.
-    storage_elems, storage_out = checks.script_storage_section("advanced", infra, NEEDS_CREDS)
+    # Advanced: existing storage account for the engine's deployment scripts (only shown when the
+    # engine runs one at this scope; see SCRIPTS_RUN_*).
+    storage_elems, storage_out = checks.script_storage_section(
+        "advanced", infra, "steps('basics').resourceScope.location.name", scripts_run)
     steps["advanced"]["elements"] += storage_elems
     out.update(storage_out)
 
@@ -226,6 +239,7 @@ def subscription_form():
     where = "deployment subscription"
 
     rp_elems, rp_ok = checks.providers("basics", sub, where)
+    ga_elems, ga_ok = checks.global_admin("basics")
     perm_elems, perm = checks.permissions("basics", "permDeploySub", f"concat('/subscriptions/', {sub})", where, "dep")
     mon_elems, mon_ok = checks.monitored_owner("scope", "steps('scope').subscriptionIds", sub)
 
@@ -234,8 +248,9 @@ def subscription_form():
             "name": "resourceScope",
             "type": "Microsoft.Common.ResourceScope",
             "subscription": {"constraints": {"validations": [
-                {"isValid": f"[{ok}]", "message": msg} for ok, msg in [
+                {"isValid": f"[{checks.or_skipped(ok)}]", "message": msg} for ok, msg in [
                     (rp_ok, "Required resource providers are missing (or still being checked) in this subscription. See the resource provider message below."),
+                    (ga_ok, "Global Administrator is required (or is still being checked). See the Global Administrator message below."),
                     (perm["uaa"], "User Access Administrator is required on this subscription (or is still being checked). See the message below."),
                     (perm["owner"], "Owner is required on this subscription (or is still being checked). See the Owner message below."),
                     (perm["stack"], "Azure Deployment Stack Owner is required on this subscription (or is still being checked). See the message below."),
@@ -246,12 +261,12 @@ def subscription_form():
                 "allowedValues": [v["value"] for v in f.elements["location"]["constraints"]["allowedValues"]],
             },
         }),
-        f.edited("intro", text="Prerequisite check for CrowdStrike Falcon Cloud Security. Select the subscription and region the deployment runs in; this page then verifies the required resource providers and your permissions. You cannot continue until every check passes."),
-    ] + dumps(rp_elems + perm_elems)
+        f.edited("intro", text="Prerequisite check for CrowdStrike Falcon Cloud Security. Select the subscription and region the deployment runs in; this page then verifies the required resource providers and your permissions. You cannot continue until every check passes, unless you skip the checks at the bottom of this page."),
+    ] + dumps(rp_elems + ga_elems + perm_elems + checks.skip_checks())
 
     scope = principal_id(f) + [
         f.edited("subscriptionIds", validations=[
-            (mon_ok, "Owner is required on every subscription to monitor (or is still being checked). See the Owner message below."),
+            (checks.or_skipped(mon_ok), "Owner is required on every subscription to monitor (or is still being checked). See the Owner message below."),
         ]),
     ] + dumps(mon_elems)
 
@@ -273,7 +288,7 @@ def subscription_form():
         "azurePrincipalId"''',
          '''"location": "[steps('basics').resourceScope.location.name]",
         "azurePrincipalId"'''),
-    ]), infra="steps('basics').resourceScope.subscription.subscriptionId")
+    ]), infra="steps('basics').resourceScope.subscription.subscriptionId", scripts_run=SCRIPTS_RUN_SUB)
 
 
 def management_group_form():
@@ -306,7 +321,7 @@ def management_group_form():
                 "allowedValues": [v["value"] for v in region["constraints"]["allowedValues"]],
             },
         }),
-        f.edited("intro", text="Prerequisite check for CrowdStrike Falcon Cloud Security at management-group scope. Select the management group, region and infrastructure subscription; this page then verifies the required resource providers and your permissions. You cannot continue until every check passes."),
+        f.edited("intro", text="Prerequisite check for CrowdStrike Falcon Cloud Security at management-group scope. Select the management group, region and infrastructure subscription; this page then verifies the required resource providers and your permissions. You cannot continue until every check passes, unless you skip the checks at the bottom of this page."),
         # ResourceScope has no management group constraints in the schema, so every blocking
         # rule for this tab sits on the (required) infrastructure subscription picker.
         dump({
@@ -315,8 +330,10 @@ def management_group_form():
             "label": "Infrastructure subscription",
             "toolTip": f.elements["csInfraSubscriptionId"]["toolTip"],
             "constraints": {"validations": [
-                {"isValid": f"[{ok}]", "message": msg} for ok, msg in [
-                    (f"not(empty({mg}))", "Select a management group above."),
+                # Selecting a management group is an input, not a check, so it can't be skipped.
+                {"isValid": f"[not(empty({mg}))]", "message": "Select a management group above."},
+            ] + [
+                {"isValid": f"[{checks.or_skipped(ok)}]", "message": msg} for ok, msg in [
                     (mg_perm["uaa"], "User Access Administrator is required on the management group (or is still being checked). See the message below."),
                     (mg_perm["owner"], "Owner is required on the management group (or is still being checked). See the Owner message below."),
                     (mg_perm["stack"], "Azure Deployment Stack Owner is required on the management group (or is still being checked). See the message below."),
@@ -324,7 +341,7 @@ def management_group_form():
                     (infra_perm["owner"], "Owner is required on the infrastructure subscription (or is still being checked). See the Owner message below."),
                 ]]},
         }),
-    ] + dumps(mg_perm_elems + rp_elems + infra_perm_elems)
+    ] + dumps(mg_perm_elems + rp_elems + infra_perm_elems + checks.skip_checks())
 
     # Subscriptions outside the selected management group can be added (the engine's
     # subscriptionIds), with the same Owner check as the subscription form.
@@ -335,7 +352,7 @@ def management_group_form():
     extra["toolTip"] = ("Optional. Subscriptions outside the selected management group to monitor as well. "
                         "Every subscription under the management group is monitored automatically.")
     extra.setdefault("constraints", {})["validations"] = [
-        {"isValid": f"[{mon_ok}]", "message": "Owner is required on every subscription to monitor (or is still being checked). See the Owner message below."}]
+        {"isValid": f"[{checks.or_skipped(mon_ok)}]", "message": "Owner is required on every subscription to monitor (or is still being checked). See the Owner message below."}]
     scope = principal_id(f) + [dump(extra)] + dumps(mon_elems)
 
     old_mg_ids = '"managementGroupIds": "[parse(concat(\'[\\"\', steps(\'basics\').managementGroupId, \'\\"]\'))]",'
@@ -357,7 +374,7 @@ def management_group_form():
         "azurePrincipalId"''',
          '''"location": "[steps('basics').resourceScope.location.name]",
         "azurePrincipalId"'''),
-    ]), infra=infra)
+    ]), infra=infra, scripts_run=SCRIPTS_RUN_MG)
 
 
 if __name__ == "__main__":

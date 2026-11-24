@@ -34,7 +34,7 @@ Two scopes, kept at parity: **subscription** and **management group / tenant roo
 | `crowdstrike-fcs-azure-bicep-generated/` | CrowdStrike's public engine (`cs-deployment-subscription.bicep`, `cs-deployment-management-group.bicep`, modules, PowerShell callback scripts). Upstream: `github.com/CrowdStrike/bicep-azure-cloud-registration`. | **No.** Replace the folder wholesale when a new bundle ships. |
 | `stacks/stackWrapper.inline.{subscription,managementGroup}.bicep` | Wrapper: declares the deployment stack, inlines the compiled engine via `loadJsonContent('../dist/...')`, passes form outputs through as engine parameters. | Yes, keep the two in step. |
 | `ui/base/uiFormDefinition.templatespec*.json` | Hand-written form source (CrowdStrike, Features, Advanced tabs). | Yes. |
-| `scripts/form-checks/checks.py` | Builders for the checks (providers, GA, UAA/Owner/Stack Owner, monitored-subscription Owner) and the Falcon IP field. | Yes. |
+| `scripts/form-checks/checks.py` | Builders for the checks (providers, GA, UAA/Owner/Stack Owner, monitored-subscription Owner), the skip-checks option, the Falcon IP field and the deployment-script storage section. | Yes. |
 | `scripts/form-checks/build_forms.py` | Builds `ui/uiFormDefinition.templatespec*.json` from `ui/base/` + `checks.py`: adds the Prerequisites and Scope tabs, rebuilds the shared CrowdStrike/Features tabs identically for both forms, rewrites outputs. | Yes. |
 | `ui/uiFormDefinition.templatespec*.json` | **Generated** forms. | No, regenerate. |
 | `deploy/` | **Generated** button payload: compiled wrappers + forms with stable names. Served publicly from raw GitHub. | No, regenerate with `make-deploy-button.sh --stage`. |
@@ -72,20 +72,47 @@ Publish a new version number for each change so links to earlier versions keep w
   `Microsoft.Common.InfoBox` (`options.style`, not `icon`), and enforced with
   `constraints.validations[].isValid` on the scope/subscription selector. "Still loading" counts as
   failing, so Next stays disabled until results arrive.
+* **The prerequisite checks are optional.** `checks.skip_checks()` adds a `skipChecks` CheckBox
+  (unticked by default) and a Warning InfoBox as the last two elements of the Prerequisites tab in
+  both forms. `checks.or_skipped(ok)` wraps a rule as `or(steps('basics').skipChecks, ok)`.
+  * Wrapped: every Prerequisites-tab check rule, and the Scope-tab monitored-subscription Owner
+    rule. The checks still run and show their result; only the blocking is lifted.
+  * Never wrapped (they're inputs, not checks): the MG form's "Select a management group above.",
+    the Advanced-tab storage rules, and the Falcon IP / credentials / Object ID validations.
+  * New check rules must be wrapped with `or_skipped()`.
+  * Don't set `defaultValue` on a CheckBox: the 2021-09-09 schema doesn't allow it (unchecked
+    already outputs false). `isInitialRegistration` in `ui/base` predates this and still has one.
+  * Not yet tested in the portal; the generated rules are checked offline only.
 * Role detection uses `GET {scope}/providers/Microsoft.Authorization/permissions`:
   UAA = actions contain `Microsoft.Authorization/*` and `*/read`; Owner = `*` with no notActions;
   Deployment Stack Owner = `Microsoft.Resources/deploymentStacks/*`. **Owner does not imply the
   other two**; each is checked separately (verified by removing roles from a test account).
-* There is **no Global Administrator check** (removed on request). `checks.global_admin()` is kept
-  unused: a plain `GET /providers/microsoft.aadiam/diagnosticSettings` (no Graph from forms; `/batch`
-  broke it; non-admins stay amber "Confirming…", never red). Without it, a non-admin fails at deploy
-  time on the engine's Entra ID diagnostic setting.
+* Global Administrator check: **subscription form only** (`subscription_form()` wires
+  `checks.global_admin("basics")`, elements in order `rp_elems + ga_elems + perm_elems`, rule on the
+  `resourceScope` subscription selector). It's inferred from a plain
+  `GET /providers/microsoft.aadiam/diagnosticSettings` (no Graph from forms). Don't route it through
+  `/batch` (that broke it). For non-admins it stays amber "Confirming…" rather than red. The
+  **management-group form has no GA check**: without Global Administrator or Security
+  Administrator, an MG deployment with real-time visibility fails on the Entra ID diagnostic setting.
 * Monitored-subscription Owner check uses ARM `/batch` (names required; >20 requests turn async).
-* Existing deployment-script storage (Advanced tab, `checks.script_storage_section`): the wrapper maps
-  `deploymentScriptStorageAccountId` / `deploymentScriptSubnetId` to the engine's
-  `deploymentScriptSettings` (null when unused). No subnet = `listKeys()` in the wrapper, and the stack
-  then stores that key readable in its parameters. Keep the stack's `parameters` a literal object:
-  wrapping it in `union()`/`if()` made preflight fail with "Expected Object but got String".
+* Existing deployment-script storage (Advanced tab, `checks.script_storage_section`):
+  * The wrapper maps `deploymentScriptStorageAccountId` / `deploymentScriptSubnetId` to the engine's
+    `deploymentScriptSettings` (null when unused). No subnet = `listKeys()` in the wrapper, and the
+    stack then stores that key readable in its parameters (the form warns). Keep the stack's
+    `parameters` a literal object: wrapping it in `union()`/`if()` made preflight fail with
+    "Expected Object but got String". The wrapper `fail()`s on a subnet without a storage account
+    and on a malformed storage account ID.
+  * Shown only when the engine runs a script at that scope (`SCRIPTS_RUN_SUB` = real-time
+    visibility; `SCRIPTS_RUN_MG` = any feature, because MG scope also runs the scope lookup).
+  * Form view validations exist only on TextBox (schema 2021-09-09); CheckBox and ResourceSelector
+    take only `required`. So every storage/subnet rule sits on a read-only `storageCheck` TextBox
+    whose `defaultValue` is the selected account's name, not on the optional subnet box.
+  * ResourceSelector filters with `scope: {subscriptionId}` (schema), not createUiDefinition's
+    `options.filter`. The existing-Event-Hub selector in `ui/base` still uses `options.filter`; it
+    deploys, so the portal accepts it, but it isn't in the schema.
+  * Verified: CrowdStrike's `cs-deployment-scope-mg.bicep` ran its script on an existing storage
+    account on both paths (key; delegated subnet + Microsoft.Storage service endpoint, no key). The
+    form in the portal and a full registration with this option are not yet tested.
 * Gate optional lookups with ArmApiControl `condition` (e.g. the existing-Event-Hub lookups), or a
   failing call with empty inputs keeps **Create** disabled.
 * DropDown `defaultValue` must be a **label**, not a value (e.g. `"Production"`, not `"prod"`).
@@ -112,7 +139,11 @@ Publish a new version number for each change so links to earlier versions keep w
 
 There is no unit-test suite. Changes are verified by:
 
-1. `python3 scripts/form-checks/build_forms.py` succeeds and both forms parse as JSON.
+1. `python3 scripts/form-checks/build_forms.py` succeeds and both forms parse as JSON. Also validate
+   both against Microsoft's published schema
+   (`https://schema.management.azure.com/schemas/2021-09-09/uiFormDefinition.schema.json`, e.g. with
+   Python `jsonschema`). Two known, already-deployed exceptions: `isInitialRegistration`'s CheckBox
+   `defaultValue` and the existing-Event-Hub selector's `options.filter`. Anything else is new.
 2. Publishing a new Template Spec version to a lab subscription and driving the form in the portal:
    every check in pass and fail states, then Review + create, then **Create**, then watching the stack:
    `az stack sub show -n <stack>` or `az stack mg show --management-group-id <mg> -n <stack>`.

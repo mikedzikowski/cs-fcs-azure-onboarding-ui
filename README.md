@@ -3,7 +3,9 @@
 This repository onboards an Azure subscription or management group to CrowdStrike Falcon Cloud
 Security through an Azure portal form. The form opens with a **Prerequisites** tab. It checks
 that the deployment scope is ready and that the signed-in user holds the required roles, and it
-won't let the user click **Next** until every check passes.
+won't let the user click **Next** until every check passes. A user who has confirmed the
+requirements another way (for example a Security Administrator rather than a Global
+Administrator) can tick **Skip the prerequisite checks** at the bottom of the tab and continue.
 
 What gets deployed:
 
@@ -58,44 +60,54 @@ A form can't run code. The checker uses only what the portal gives a form:
    failure says what's missing and how to fix it.
 3. `constraints.validations` rules on the scope picker block **Next** while any check fails or
    is still running.
+4. A **Skip the prerequisite checks** checkbox at the bottom of the Prerequisites tab (unticked
+   by default) lifts those rules, and the Owner rule on the Scope tab. The checks still run and
+   show their results, and a warning box says the deployment fails if a requirement is really
+   missing. Input fields (Falcon credentials, IP addresses, Object ID, deployment script storage)
+   keep their validation. **Not yet tested in the portal.**
 
 ### What it checks (subscription scope)
 
 | Check | How | Passes when |
 |---|---|---|
 | Resource providers | `GET /subscriptions/{id}/providers/{ns}`, once per provider: Microsoft.Management, ContainerInstance, Storage, Resources, Insights, PolicyInsights, EventHub | every provider is `Registered` |
+| Global Administrator (**inferred**) | `GET /providers/microsoft.aadiam/diagnosticSettings` | the user can read Entra ID diagnostic settings |
 | User Access Administrator | `GET .../providers/Microsoft.Authorization/permissions` | an entry has both `Microsoft.Authorization/*` and `*/read` |
 | Owner | same call | an entry has `*` and no `notActions` |
 | Azure Deployment Stack Owner | same call | an entry has `Microsoft.Resources/deploymentStacks/*` |
 | Owner on monitored subscriptions (Scope tab) | one ARM `/batch` call across the "Subscriptions to monitor" list | Owner on each one (**not yet tested in the portal**) |
 
 Each role is detected by an action list that only its built-in definition has. Owner alone
-**doesn't** pass the User Access Administrator or Deployment Stack Owner checks.
-
-The form **doesn't check Global Administrator**. With real-time visibility on, the engine creates a
-tenant-level Entra ID diagnostic setting, which needs an Entra ID admin role (CrowdStrike's guide:
-Global Administrator or Security Administrator). A user without one passes the form and the
-deployment fails on that setting.
+**doesn't** pass the User Access Administrator or Deployment Stack Owner checks. Forms can't call
+Microsoft Graph, so Global Administrator is inferred: the check reads the same Entra ID resource
+the template later writes (with real-time visibility on, a tenant-level Entra ID diagnostic
+setting). It isn't a role lookup. CrowdStrike's guide also accepts Security Administrator for that
+step; a Security Administrator who isn't detected can use the skip checkbox.
 
 ### Management-group variant (tested at Tenant Root Group via Template Spec)
 
-The management-group form runs the same kinds of checks against different scopes:
+The management-group form runs the same kinds of checks against different scopes, except the
+Global Administrator check, which it doesn't have:
 
 * User Access Administrator, Owner, and Azure Deployment Stack Owner on the selected management
   group.
 * Resource providers and Owner on the **infrastructure subscription**.
 
-All of its blocking rules are on the infrastructure-subscription picker.
+All of its blocking rules are on the infrastructure-subscription picker. Without a Global
+Administrator check, a user with no Entra ID admin role (Global Administrator or Security
+Administrator) passes this form, and with real-time visibility on the deployment fails on the
+Entra ID diagnostic setting. It has the same skip checkbox; "Select a management group" is an
+input, so it can't be skipped.
 
 ### Screenshots
 
 These screenshots come from the subscription-scope Template Spec in a lab tenant.
 Subscription IDs are redacted.
 
-**All checks passing.** Every result box is blue: resource providers registered, and User Access
-Administrator, Owner, and Azure Deployment Stack Owner confirmed on the deployment subscription.
-**Next** is available. (These screenshots predate removing the Global Administrator check, so they
-still show its box.)
+**All checks passing.** Every result box is blue: resource providers registered, Global
+Administrator confirmed, and User Access Administrator, Owner, and Azure Deployment Stack Owner
+confirmed on the deployment subscription. **Next** is available. (The screenshots predate the skip
+checkbox, so they don't show it.)
 
 ![All prerequisite checks passing](docs/images/prereq-check-all-passed.png)
 
@@ -106,8 +118,9 @@ assign before signing out and back in.
 
 ![Missing provider and Deployment Stack Owner](docs/images/prereq-check-failures.png)
 
-**A user with only Reader and no Entra ID admin role.** Providers pass. User Access
-Administrator, Owner, and Stack Owner are all reported missing. The portal's own
+**A user with only Reader and no Entra ID admin role.** Providers pass. The Global Administrator
+box stays amber ("Confirming…") because a denied lookup returns nothing the form can read.
+User Access Administrator, Owner, and Stack Owner are all reported missing. The portal's own
 check also reports the missing `Microsoft.Resources/deployments/validate/action` permission.
 
 ![Non-admin user: every permission check failing](docs/images/prereq-check-nonadmin-user.png)
@@ -271,30 +284,59 @@ Things to know:
 
 ## Using an existing storage account for the deployment scripts
 
-The CrowdStrike template runs deployment scripts (the Falcon callback and, at management-group
-scope, the scope lookup) in an Azure Container Instance. By default the script service creates its
-own storage account with public network access. If a policy blocks that (for example "Storage
-accounts should disable public network access"), tick **Use an existing storage account for
-deployment scripts** on the **Advanced** tab. It appears when real-time visibility, DSPM or
-vulnerability scanning is on, because only those run scripts. This follows CrowdStrike's guidance:
+The CrowdStrike template runs deployment scripts in an Azure Container Instance. By default the
+script service creates its own storage account with public network access. If a policy blocks that
+(for example "Storage accounts should disable public network access"), tick **Use an existing
+storage account for deployment scripts** on the **Advanced** tab. This follows CrowdStrike's
+guidance:
 [Deployment fails because the auto-created deployment script storage account violates policy](https://github.com/CrowdStrike/azure-bicep-cloud-registration#deployment-fails-because-the-auto-created-deployment-script-storage-account-violates-policy).
 
-The form reads the selected storage account and blocks **Next** unless it is:
+The option appears only when the template runs a script at that scope:
 
-* in the **infrastructure subscription** (deployment scripts only accept one from their own subscription),
-* `allowSharedKeyAccess` **true** (needed even with a subnet),
-* without firewall rules (`networkAcls.defaultAction` **Allow**; `publicNetworkAccess: Disabled` is fine),
-* a kind with Azure file shares (`StorageV2`, `Storage` or `FileStorage`).
+* **Subscription form:** with real-time visibility (the Falcon callback is the only script).
+* **Management-group form:** with real-time visibility, DSPM or vulnerability scanning (the scope
+  lookup also runs a script).
 
-**Subnet (optional).** If the storage account is only reachable through a private endpoint, enter a
-subnet in the infrastructure subscription delegated to `Microsoft.ContainerInstance/containerGroups`.
-The script then runs in that virtual network and mounts the share with its managed identity (the
-template grants it Storage File Data Privileged Contributor), so **no key is passed**.
+**What the form checks.** It reads the selected storage account (and subnet) and blocks **Next**
+unless:
+
+* the storage account is in the **infrastructure subscription** (the picker only lists those);
+* `allowSharedKeyAccess` is **true** (needed even with a subnet);
+* it has no firewall rules (`networkAcls.defaultAction` **Allow**);
+* its kind and SKU support Azure file shares: `StorageV2` (or `Storage` with LRS/GRS/RAGRS) with a
+  Standard SKU, or `FileStorage` with a Premium SKU;
+* if `publicNetworkAccess` is **Disabled**, a subnet is entered;
+* a subnet, if entered, is a full resource ID in the infrastructure subscription, delegated to
+  `Microsoft.ContainerInstance/containerGroups`, in a virtual network in the deployment region.
+
+All of these rules sit on a read-only "Selected storage account" box, so they run whether or not the
+subnet is filled in.
+
+**Subnet (needed when public network access is disabled).** The script runs in that virtual network
+and mounts the file share with its managed identity (the template grants it Storage File Data
+Privileged Contributor on the storage account), so **no key is passed**. The form can't check these
+Azure Container Instances requirements; set them up first:
+
+* a **NAT gateway** on the subnet: Microsoft lists it as the only supported outbound path for a
+  container group in a virtual network, and the script needs outbound access (container image,
+  Azure Resource Manager, the Falcon API);
+* a `Microsoft.Storage` **service endpoint** on the subnet (or a private endpoint with its
+  `privatelink.file.core.windows.net` DNS zone linked to the virtual network);
+* a subnet of at least **/24** (Microsoft: smaller subnets can fail with "subnet full").
 
 **Without a subnet**, the wrapper looks up the storage account key (`listKeys`) during deployment.
 The user never types it, but the deployment stack stores it **readable in its parameters**
 (`az stack ... show`), visible to anyone who can read the stack. The form shows this as a warning.
-Use a subnet if that's not acceptable.
+Use a subnet, or rotate the key after deploying (`az storage account keys renew --key key1`).
+
+**File shares.** Each run creates a file share in the storage account. The scripts use a 24-hour
+retention (`cleanupPreference: OnExpiration`), so shares stay for about a day after each deployment.
+
+**Tested.** CrowdStrike's own scope-lookup module (`cs-deployment-scope-mg.bicep`, which runs a
+deployment script and calls no Falcon API) ran successfully against an existing storage account on
+both paths in a lab tenant: with a key, and with a delegated subnet (with a `Microsoft.Storage`
+service endpoint) and no key. The share was created in the chosen account and no storage account
+was auto-created. The full registration and the form in the portal haven't been run with this option.
 
 ## Repository layout
 

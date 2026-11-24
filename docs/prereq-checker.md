@@ -25,7 +25,7 @@ A user with only Reader and no Entra admin role: GA unconfirmed, and UAA, Owner 
  │     └── Microsoft.Resources/deploymentStacks   ← the only resource
  │           └── template: CrowdStrike engine (inlined at build time)
  └── uiFormDefinition    ui/uiFormDefinition.templatespec.json
-       ├── Prerequisites  ResourceScope + checks (blocks Next)
+       ├── Prerequisites  ResourceScope + checks (blocks Next unless skipped)
        ├── Scope          service principal, subscriptions to monitor (+ Owner check)
        ├── CrowdStrike    Falcon cloud, API client
        ├── Features       real-time visibility, DSPM, scanning
@@ -67,17 +67,29 @@ Every check follows the same pattern:
    picker. While any rule is false, the portal shows the message under the picker and won't
    leave the tab. **Still checking counts as failing**, so nobody can click through before
    the lookups return.
+4. **Skip (opt-out).** Every check rule is wrapped as
+   `or(steps('basics').skipChecks, <pass expression>)` (`checks.or_skipped()`). The **Skip the
+   prerequisite checks** checkbox (`checks.skip_checks()`) at the bottom of the Prerequisites tab
+   is unticked by default. Ticking it lifts the rules and shows a warning box; the checks keep
+   running and showing their results. It's there for checks that are wrong for a user, such as a
+   Security Administrator (CrowdStrike accepts that role for the Entra ID diagnostic setting, but
+   the subscription form only detects Global Administrator), or a lookup that never returns.
+   Only check rules are wrapped: the management-group form's "Select a management group" rule and
+   the input validations on later tabs (Falcon credentials, IP addresses, Object ID, deployment
+   script storage) still apply.
 
 One function in `scripts/form-checks/checks.py` builds the box and its blocking rule from the
 same expression, so they can't disagree.
 
 ## 3. The checks
 
-All checks run against the **deployment subscription** selected on the Prerequisites tab.
+All checks run against the **deployment subscription** selected on the Prerequisites tab. This
+table is the subscription form; the management-group form's checks are listed after it.
 
 | Check | API call (as the user) | Passes when | Why it's required |
 |---|---|---|---|
 | Resource providers | `GET /subscriptions/{id}/providers/{namespace}` × 7 | every `registrationState` is `Registered` | ARM doesn't auto-register providers for resources it creates indirectly (deployment scripts create a container instance and storage account). CrowdStrike's registration guide lists them as prerequisites. |
+| Global Administrator (subscription form only) | `GET /providers/microsoft.aadiam/diagnosticSettings` | the response has a `value` | The template creates an Entra ID diagnostic setting. CrowdStrike's guide requires Global Administrator (or Security Administrator) for that. |
 | User Access Administrator | `GET /subscriptions/{id}/providers/Microsoft.Authorization/permissions` | an entry contains both `Microsoft.Authorization/*` and `*/read` | Customer requirement: the role must be assigned itself. Owner doesn't count. |
 | Owner | same call as above | an entry has `actions: ["*"]` with no `notActions` | CrowdStrike's guide requires Owner on the deployment scope. |
 | Azure Deployment Stack Owner | same call as above | an entry contains `Microsoft.Resources/deploymentStacks/*` | CrowdStrike's guide requires this role on the stack's scope, assigned separately. Owner alone isn't enough. |
@@ -86,7 +98,14 @@ The seven providers are Microsoft.Management, ContainerInstance, Storage, Resour
 PolicyInsights and EventHub.
 
 On the **Scope** tab, a further check confirms **Owner on every subscription in "Subscriptions
-to monitor"**, using one ARM `/batch` call. It blocks Next on that tab.
+to monitor"**, using one ARM `/batch` call. It blocks Next on that tab unless the checks are
+skipped.
+
+The **management-group form** checks User Access Administrator, Owner and Azure Deployment Stack
+Owner on the selected management group, and resource providers and Owner on the infrastructure
+subscription. It has **no Global Administrator check**. Its rules sit on the
+infrastructure-subscription picker, after an input rule ("Select a management group above.")
+that the skip checkbox doesn't lift.
 
 ### How a role is detected
 
@@ -109,16 +128,17 @@ tenant root, which every subscription inherits, so it passes the UAA check.
 
 A custom role that copies one of these action lists would also pass.
 
-### Global Administrator isn't checked
+### Why Global Administrator is inferred (subscription form only)
 
-The forms used to infer Global Administrator by reading the tenant's Entra ID diagnostic settings
-(`GET /providers/microsoft.aadiam/diagnosticSettings`; forms can't call Microsoft Graph). That
-check was removed. The builder, `checks.global_admin()`, is still in `checks.py`, unused.
+Entra ID roles live in Microsoft Graph, and forms can't call Graph. The subscription form reads
+the tenant's Entra ID diagnostic settings instead. That's the same resource the template later
+writes (with real-time visibility on, a tenant-level Entra ID diagnostic setting,
+`modules/log-ingestion/entraLog.bicep`), and the same permission boundary CrowdStrike's
+requirement is about. It's an inference, not a role lookup.
 
-What it guarded still applies: with real-time visibility on, the engine creates a tenant-level
-Entra ID diagnostic setting (`modules/log-ingestion/entraLog.bicep`), and CrowdStrike's guide
-requires Global Administrator or Security Administrator for that. A user without such a role now
-passes the form and the deployment fails on that resource.
+The management-group form doesn't have this check. There, a user without Global Administrator or
+Security Administrator passes the form, and with real-time visibility on the deployment fails on
+the Entra ID diagnostic setting.
 
 ### Which ID the template expects for the CrowdStrike app
 
@@ -199,7 +219,9 @@ The deployment context in `view.outputs` then reads:
 "location":       "[steps('basics').resourceScope.location.name]"
 ```
 
-All five Prerequisites validations are attached to `resourceScope.subscription.constraints`.
+All five Prerequisites validations (providers, Global Administrator, User Access Administrator,
+Owner, Stack Owner) are attached to `resourceScope.subscription.constraints`, each wrapped with
+`checks.or_skipped()`.
 
 ## 5. Build and publish
 
@@ -236,7 +258,8 @@ To try a form without publishing, paste the built JSON into the
    makes ARM calls. **Yes** loads the real form; **No** falls back to a generic one without
    the checks.
 2. **Prerequisites.** Pick the subscription and region. Each check moves from "checking…" to
-   "confirmed" or "Missing …".
+   "confirmed" or "Missing …". A user who has confirmed the requirements another way can tick
+   **Skip the prerequisite checks** at the bottom of the tab instead.
 3. **Fix and retry.** For provider failures, the message gives the `az provider register`
    command; register, then reload. For role failures, assign or activate (PIM) the role, then
    **sign out of the portal and back in**. The form reads the session's permissions, and
@@ -253,22 +276,37 @@ To try a form without publishing, paste the built JSON into the
 | UAA check: passes only with the UAA role (after sign-out/in) | ✅ seen in the portal |
 | Owner check | ✅ seen in the portal |
 | Stack Owner check: red without the role, green after assigning it | ✅ seen in the portal |
+| Global Administrator check passes for a GA (subscription form) | ✅ seen in the portal (before the check was removed in `f6e20c3`; the restored check is the same elements and rule) |
+| Global Administrator check for a **non-GA** user (subscription form) | ✅ seen in the portal (same caveat): the amber "Confirming Global Administrator…" box stays up and Next is blocked. The red "Missing Global Administrator" box never appears, because a denied lookup doesn't return an `error` the form can read |
 | Next / Review + create blocked while any check fails | ✅ seen in the portal |
+| Skip the prerequisite checks: Next allowed with failing or loading checks, warning shown | ⚠️ not yet tested in the portal (generated rules checked offline) |
 | End-to-end deployment from the form (stack `succeeded`, 12 managed resources, Event Hub firewall limited to the Falcon cloud's IPs) | ✅ deployed 2026-11-02 |
 | Owner check on monitored subscriptions (`/batch`) | ⚠️ not yet tested (`/batch` didn't work for the GA check in the portal) |
 | Management-group form | ⚠️ never published |
-| Existing storage account for deployment scripts (Advanced tab) | ⚠️ form not yet opened in the portal. Wrapper: ARM preflight passes at both scopes with the option off, key path and subnet path. A test stack ran a deployment script on an existing storage account with a `listKeys` key (2026-11-23). Not yet run through the full CrowdStrike engine |
+| Existing storage account for deployment scripts: CrowdStrike's engine script | ✅ 2026-11-24, lab tenant: CrowdStrike's `cs-deployment-scope-mg.bicep` (scope lookup; no Falcon call) ran its deployment script on an existing storage account, once with a key and once with a delegated subnet + `Microsoft.Storage` service endpoint and no key. Share created in the chosen account; no auto-created storage account |
+| Existing storage account: wrappers | ✅ ARM preflight passes at both scopes with the option off, key path and subnet path; the wrapper's `fail()` guards reject a subnet without a storage account and a malformed storage account ID |
+| Existing storage account: form rules | ⚠️ not yet opened in the portal. Checked offline: forms validate against the published 2021-09-09 Form view schema (no new errors), and every rule was evaluated against simulated portal states (23 cases per form, all pass) |
+| Existing storage account: full registration (Falcon callback) | ⚠️ not run |
 
 ## 8. Known limits
 
-* **Global Administrator isn't checked** (section 3). Without an Entra ID admin role the
+* **Global Administrator is inferred, and only on the subscription form** (section 3). Roles that
+  can read Entra ID diagnostic settings may also pass. CrowdStrike accepts Security Administrator
+  for this step; a Security Administrator who isn't detected has to skip the checks. The
+  management-group form has no Global Administrator check: without an Entra ID admin role its
   deployment fails at the Entra ID diagnostic setting rather than on the Prerequisites tab.
+* **The checks can be skipped.** With **Skip the prerequisite checks** ticked, nothing on the
+  Prerequisites tab or the Scope-tab Owner check blocks Next; a missing provider or role then shows
+  up as a failed deployment stack.
 * **Only the deployment subscription is checked for providers.** CrowdStrike's guide needs
   Microsoft.Insights in every registered subscription.
 * **The monitored-subscription check is limited to one tenant, at most 20 subscriptions, no
   duplicates** (ARM `/batch` limits).
 * **Re-checks need a reload.** Forms don't poll, so after fixing something the user reloads the
   form, or signs out and in for role changes.
+* **Deployment script storage: what the form can't check.** A subnet's NAT gateway (Microsoft: the
+  only supported outbound path for a container group in a virtual network), its `Microsoft.Storage`
+  service endpoint or private endpoint + DNS, and a /24-or-larger size. The info box lists them.
 * **Deployment script storage key is stored in the stack.** Without a subnet, the wrapper looks up
   the storage account key and passes it in the engine's `deploymentScriptSettings` object. A
   deployment stack keeps a secure value nested in an object readable in its parameters (seen in a
@@ -295,7 +333,8 @@ To add a role check:
 
 1. Add the action-list condition to `has` in `permissions()`, with its pass and fail text.
 2. Add its key to the `checks=` list in `build_forms.py`.
-3. Add its `isValid` rule to `resourceScope.subscription.constraints.validations`.
+3. Add its `isValid` rule to `resourceScope.subscription.constraints.validations`, wrapped with
+   `checks.or_skipped()` so the skip checkbox lifts it.
 
 Then run `python3 scripts/form-checks/build_forms.py`, preview the result in the sandbox, and
 publish a new version.

@@ -35,7 +35,7 @@
               "type": "Microsoft.Common.InfoBox",
               "visible": true,
               "options": {
-                "text": "Prerequisite check for CrowdStrike Falcon Cloud Security at management-group scope. Select the management group, region and infrastructure subscription; this page then verifies the required resource providers and your permissions. You cannot continue until every check passes.",
+                "text": "Prerequisite check for CrowdStrike Falcon Cloud Security at management-group scope. Select the management group, region and infrastructure subscription; this page then verifies the required resource providers and your permissions. You cannot continue until every check passes, unless you skip the checks at the bottom of this page.",
                 "style": "Info"
               }
             },
@@ -51,23 +51,23 @@
                     "message": "Select a management group above."
                   },
                   {
-                    "isValid": "[and(not(empty(steps('basics').permMg.value)), not(empty(filter(steps('basics').permMg.value, (p) => and(contains(p.actions, 'Microsoft.Authorization/*'), contains(p.actions, '*/read'))))))]",
+                    "isValid": "[or(steps('basics').skipChecks, and(not(empty(steps('basics').permMg.value)), not(empty(filter(steps('basics').permMg.value, (p) => and(contains(p.actions, 'Microsoft.Authorization/*'), contains(p.actions, '*/read')))))))]",
                     "message": "User Access Administrator is required on the management group (or is still being checked). See the message below."
                   },
                   {
-                    "isValid": "[and(not(empty(steps('basics').permMg.value)), not(empty(filter(steps('basics').permMg.value, (p) => and(contains(p.actions, '*'), empty(p.notActions))))))]",
+                    "isValid": "[or(steps('basics').skipChecks, and(not(empty(steps('basics').permMg.value)), not(empty(filter(steps('basics').permMg.value, (p) => and(contains(p.actions, '*'), empty(p.notActions)))))))]",
                     "message": "Owner is required on the management group (or is still being checked). See the Owner message below."
                   },
                   {
-                    "isValid": "[and(not(empty(steps('basics').permMg.value)), not(empty(filter(steps('basics').permMg.value, (p) => contains(p.actions, 'Microsoft.Resources/deploymentStacks/*')))))]",
+                    "isValid": "[or(steps('basics').skipChecks, and(not(empty(steps('basics').permMg.value)), not(empty(filter(steps('basics').permMg.value, (p) => contains(p.actions, 'Microsoft.Resources/deploymentStacks/*'))))))]",
                     "message": "Azure Deployment Stack Owner is required on the management group (or is still being checked). See the message below."
                   },
                   {
-                    "isValid": "[and(and(not(empty(steps('basics').rpManagement.registrationState)), not(empty(steps('basics').rpContainerInstance.registrationState)), not(empty(steps('basics').rpStorage.registrationState)), not(empty(steps('basics').rpResources.registrationState)), not(empty(steps('basics').rpInsights.registrationState)), not(empty(steps('basics').rpPolicyInsights.registrationState)), not(empty(steps('basics').rpEventHub.registrationState))), not(or(and(not(empty(steps('basics').rpManagement.registrationState)), not(equals(steps('basics').rpManagement.registrationState, 'Registered'))), and(not(empty(steps('basics').rpContainerInstance.registrationState)), not(equals(steps('basics').rpContainerInstance.registrationState, 'Registered'))), and(not(empty(steps('basics').rpStorage.registrationState)), not(equals(steps('basics').rpStorage.registrationState, 'Registered'))), and(not(empty(steps('basics').rpResources.registrationState)), not(equals(steps('basics').rpResources.registrationState, 'Registered'))), and(not(empty(steps('basics').rpInsights.registrationState)), not(equals(steps('basics').rpInsights.registrationState, 'Registered'))), and(not(empty(steps('basics').rpPolicyInsights.registrationState)), not(equals(steps('basics').rpPolicyInsights.registrationState, 'Registered'))), and(not(empty(steps('basics').rpEventHub.registrationState)), not(equals(steps('basics').rpEventHub.registrationState, 'Registered'))))))]",
+                    "isValid": "[or(steps('basics').skipChecks, and(and(not(empty(steps('basics').rpManagement.registrationState)), not(empty(steps('basics').rpContainerInstance.registrationState)), not(empty(steps('basics').rpStorage.registrationState)), not(empty(steps('basics').rpResources.registrationState)), not(empty(steps('basics').rpInsights.registrationState)), not(empty(steps('basics').rpPolicyInsights.registrationState)), not(empty(steps('basics').rpEventHub.registrationState))), not(or(and(not(empty(steps('basics').rpManagement.registrationState)), not(equals(steps('basics').rpManagement.registrationState, 'Registered'))), and(not(empty(steps('basics').rpContainerInstance.registrationState)), not(equals(steps('basics').rpContainerInstance.registrationState, 'Registered'))), and(not(empty(steps('basics').rpStorage.registrationState)), not(equals(steps('basics').rpStorage.registrationState, 'Registered'))), and(not(empty(steps('basics').rpResources.registrationState)), not(equals(steps('basics').rpResources.registrationState, 'Registered'))), and(not(empty(steps('basics').rpInsights.registrationState)), not(equals(steps('basics').rpInsights.registrationState, 'Registered'))), and(not(empty(steps('basics').rpPolicyInsights.registrationState)), not(equals(steps('basics').rpPolicyInsights.registrationState, 'Registered'))), and(not(empty(steps('basics').rpEventHub.registrationState)), not(equals(steps('basics').rpEventHub.registrationState, 'Registered')))))))]",
                     "message": "Required resource providers are missing (or still being checked) in the infrastructure subscription. See the resource provider message below."
                   },
                   {
-                    "isValid": "[and(not(empty(steps('basics').permInfra.value)), not(empty(filter(steps('basics').permInfra.value, (p) => and(contains(p.actions, '*'), empty(p.notActions))))))]",
+                    "isValid": "[or(steps('basics').skipChecks, and(not(empty(steps('basics').permInfra.value)), not(empty(filter(steps('basics').permInfra.value, (p) => and(contains(p.actions, '*'), empty(p.notActions)))))))]",
                     "message": "Owner is required on the infrastructure subscription (or is still being checked). See the Owner message below."
                   }
                 ]
@@ -266,6 +266,21 @@
                 "text": "Missing Owner - you need Owner on the infrastructure subscription. Assign Owner (or activate it in PIM), then sign out of the Azure portal, sign back in and reopen this form (role changes can take up to 10 minutes to apply).",
                 "uri": "https://learn.microsoft.com/azure/role-based-access-control/role-assignments-portal"
               }
+            },
+            {
+              "name": "skipChecks",
+              "type": "Microsoft.Common.CheckBox",
+              "label": "Skip the prerequisite checks (I have confirmed the requirements myself)",
+              "toolTip": "Lets you continue while a check is failing or still loading. The deployment fails if a requirement is really missing."
+            },
+            {
+              "name": "skipChecksWarning",
+              "type": "Microsoft.Common.InfoBox",
+              "visible": "[steps('basics').skipChecks]",
+              "options": {
+                "style": "Warning",
+                "text": "Prerequisite checks skipped. If a resource provider or role is really missing, the deployment stack fails partway through. CrowdStrike requires Owner and Azure Deployment Stack Owner on the deployment scope, and Global Administrator or Security Administrator in Entra ID when real-time visibility creates the Entra ID diagnostic setting."
+              }
             }
           ]
         },
@@ -318,7 +333,7 @@
                 "required": false,
                 "validations": [
                   {
-                    "isValid": "[or(equals(length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(steps('basics').csInfraSubscription.subscriptionId))))), 0), and(equals(length(coalesce(steps('scope').permMonitored.responses, parse('[]'))), length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(steps('basics').csInfraSubscription.subscriptionId)))))), empty(map(filter(coalesce(steps('scope').permMonitored.responses, parse('[]')), (r) => not(and(equals(r.httpStatusCode, 200), contains(string(r.content.value), '\"actions\":[\"*\"],\"dataActions\":[],\"notActions\":[]')))), (r) => r.name))))]",
+                    "isValid": "[or(steps('basics').skipChecks, or(equals(length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(steps('basics').csInfraSubscription.subscriptionId))))), 0), and(equals(length(coalesce(steps('scope').permMonitored.responses, parse('[]'))), length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(steps('basics').csInfraSubscription.subscriptionId)))))), empty(map(filter(coalesce(steps('scope').permMonitored.responses, parse('[]')), (r) => not(and(equals(r.httpStatusCode, 200), contains(string(r.content.value), '\"actions\":[\"*\"],\"dataActions\":[],\"notActions\":[]')))), (r) => r.name)))))]",
                     "message": "Owner is required on every subscription to monitor (or is still being checked). See the Owner message below."
                   }
                 ]
@@ -798,7 +813,7 @@
                   "options": {
                     "style": "Info",
                     "uri": "https://github.com/CrowdStrike/azure-bicep-cloud-registration#deployment-fails-because-the-auto-created-deployment-script-storage-account-violates-policy",
-                    "text": "Use a storage account in the infrastructure subscription with shared key access enabled and no firewall rules (public network access can be disabled). If it's only reachable through a private endpoint, also enter a subnet delegated to Microsoft.ContainerInstance/containerGroups so the script runs in that virtual network."
+                    "text": "Use a storage account in the infrastructure subscription with shared key access enabled and no firewall rules. If public network access is disabled on it, also enter a subnet in the deployment region delegated to Microsoft.ContainerInstance/containerGroups, so the script runs in that virtual network. That subnet needs a NAT gateway for outbound traffic and a Microsoft.Storage service endpoint (Azure Container Instances requirements the form can't check)."
                   }
                 },
                 {
@@ -807,11 +822,8 @@
                   "label": "Storage account",
                   "resourceType": "Microsoft.Storage/storageAccounts",
                   "toolTip": "Existing storage account in the infrastructure subscription.",
-                  "options": {
-                    "filter": {
-                      "subscription": "all",
-                      "location": "all"
-                    }
+                  "scope": {
+                    "subscriptionId": "[steps('basics').csInfraSubscription.subscriptionId]"
                   },
                   "constraints": {
                     "required": "[and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)]"
@@ -831,14 +843,39 @@
                   "type": "Microsoft.Common.TextBox",
                   "label": "Subnet resource ID (optional)",
                   "placeholder": "/subscriptions/<id>/resourceGroups/<rg>/providers/Microsoft.Network/virtualNetworks/<vnet>/subnets/<subnet>",
-                  "toolTip": "Optional. A subnet delegated to Microsoft.ContainerInstance/containerGroups. With a subnet, the script mounts the storage with its managed identity and no key is passed.",
+                  "toolTip": "Optional unless public network access is disabled on the storage account. A subnet delegated to Microsoft.ContainerInstance/containerGroups. With a subnet, the script mounts the storage with its managed identity and no key is passed.",
                   "constraints": {
-                    "required": false,
+                    "required": false
+                  }
+                },
+                {
+                  "name": "subnetApi",
+                  "type": "Microsoft.Solutions.ArmApiControl",
+                  "request": {
+                    "method": "GET",
+                    "path": "[concat(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', ''), '?api-version=2024-05-01')]"
+                  },
+                  "condition": "[and(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), not(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', ''))), contains(toLower(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), '/subnets/'))]"
+                },
+                {
+                  "name": "vnetApi",
+                  "type": "Microsoft.Solutions.ArmApiControl",
+                  "request": {
+                    "method": "GET",
+                    "path": "[concat(substring(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', ''), 0, lastIndexOf(toLower(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), '/subnets/')), '?api-version=2024-05-01')]"
+                  },
+                  "condition": "[and(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), not(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', ''))), contains(toLower(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), '/subnets/'))]"
+                },
+                {
+                  "name": "storageCheck",
+                  "type": "Microsoft.Common.TextBox",
+                  "label": "Selected storage account",
+                  "readOnly": true,
+                  "defaultValue": "[coalesce(steps('advanced').scriptStorage.storageAccount.name, '')]",
+                  "toolTip": "The storage account the deployment scripts will use. The checks below run against it.",
+                  "constraints": {
+                    "required": "[and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)]",
                     "validations": [
-                      {
-                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), not(empty(coalesce(steps('advanced').scriptStorage.storageAccount.id, ''))))]",
-                        "message": "Select a storage account."
-                      },
                       {
                         "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(empty(coalesce(steps('advanced').scriptStorage.storageAccount.id, '')), not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))))]",
                         "message": "Still reading the storage account (or it couldn't be read)."
@@ -853,31 +890,38 @@
                       },
                       {
                         "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(coalesce(steps('advanced').scriptStorage.storageApi.properties.networkAcls.defaultAction, 'Allow'), 'Deny'))))]",
-                        "message": "The storage account has firewall rules (default action Deny). Deployment scripts don't support storage firewalls; use publicNetworkAccess Disabled instead."
+                        "message": "The storage account has firewall rules (default action Deny). CrowdStrike's template doesn't support storage firewalls; use publicNetworkAccess Disabled with a subnet instead."
                       },
                       {
-                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), contains(parse('[\"StorageV2\",\"Storage\",\"FileStorage\"]'), steps('advanced').scriptStorage.storageApi.kind)))]",
-                        "message": "The storage account kind doesn't support Azure file shares. Use StorageV2 (or FileStorage)."
+                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), or(and(startsWith(coalesce(steps('advanced').scriptStorage.storageApi.sku.name, ''), 'Premium_'), equals(coalesce(steps('advanced').scriptStorage.storageApi.kind, ''), 'FileStorage')), and(contains(parse('[\"Standard_LRS\",\"Standard_GRS\",\"Standard_RAGRS\"]'), coalesce(steps('advanced').scriptStorage.storageApi.sku.name, '')), contains(parse('[\"Storage\",\"StorageV2\"]'), coalesce(steps('advanced').scriptStorage.storageApi.kind, ''))), and(contains(parse('[\"Standard_ZRS\",\"Standard_GZRS\",\"Standard_RAGZRS\"]'), coalesce(steps('advanced').scriptStorage.storageApi.sku.name, '')), equals(coalesce(steps('advanced').scriptStorage.storageApi.kind, ''), 'StorageV2')))))]",
+                        "message": "This storage account's kind and SKU don't support Azure file shares. Use StorageV2 with a Standard SKU, or FileStorage with a Premium SKU."
+                      },
+                      {
+                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(coalesce(steps('advanced').scriptStorage.storageApi.properties.publicNetworkAccess, 'Enabled'), 'Disabled')), not(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')))))]",
+                        "message": "Public network access is disabled on this storage account, so the script can only reach it from a virtual network. Enter a delegated subnet."
                       },
                       {
                         "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), startsWith(toLower(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), toLower(concat('/subscriptions/', steps('basics').csInfraSubscription.subscriptionId, '/')))))]",
                         "message": "The subnet must be in the infrastructure subscription."
                       },
                       {
+                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), contains(toLower(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), '/subnets/')))]",
+                        "message": "Enter the subnet's full resource ID (…/virtualNetworks/<vnet>/subnets/<subnet>)."
+                      },
+                      {
+                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), not(empty(coalesce(steps('advanced').scriptStorage.subnetApi.name, '')))))]",
+                        "message": "Still reading the subnet (or it couldn't be read - check the resource ID and your access)."
+                      },
+                      {
                         "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), not(not(empty(coalesce(steps('advanced').scriptStorage.subnetApi.name, '')))), contains(map(coalesce(steps('advanced').scriptStorage.subnetApi.properties.delegations, parse('[]')), (d) => d.properties.serviceName), 'Microsoft.ContainerInstance/containerGroups')))]",
                         "message": "The subnet isn't delegated to Microsoft.ContainerInstance/containerGroups."
+                      },
+                      {
+                        "isValid": "[or(not(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage)), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), not(not(empty(coalesce(steps('advanced').scriptStorage.vnetApi.location, '')))), equals(toLower(steps('advanced').scriptStorage.vnetApi.location), toLower(steps('basics').resourceScope.location.name))))]",
+                        "message": "The subnet's virtual network must be in the deployment region (the script's container instance runs there)."
                       }
                     ]
                   }
-                },
-                {
-                  "name": "subnetApi",
-                  "type": "Microsoft.Solutions.ArmApiControl",
-                  "request": {
-                    "method": "GET",
-                    "path": "[concat(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', ''), '?api-version=2024-05-01')]"
-                  },
-                  "condition": "[and(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), not(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', ''))))]"
                 },
                 {
                   "name": "scriptStorageKeyWarning",
@@ -885,16 +929,16 @@
                   "visible": "[and(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')))]",
                   "options": {
                     "style": "Warning",
-                    "text": "Without a subnet, the deployment looks up this storage account's access key and passes it to the CrowdStrike template. The deployment stack stores it in its parameters, readable by anyone who can read the stack. Enter a delegated subnet to avoid passing a key."
+                    "text": "Without a subnet, the deployment looks up this storage account's access key and passes it to the CrowdStrike template. It is then readable in the deployment stack's parameters by anyone who can read the stack. Enter a delegated subnet to avoid passing a key, or rotate the key after deploying."
                   }
                 },
                 {
                   "name": "scriptStorageOk",
                   "type": "Microsoft.Common.InfoBox",
-                  "visible": "[and(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), not(empty(coalesce(steps('advanced').scriptStorage.storageAccount.id, ''))), not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, ''))), startsWith(toLower(coalesce(steps('advanced').scriptStorage.storageAccount.id, '')), toLower(concat('/subscriptions/', steps('basics').csInfraSubscription.subscriptionId, '/'))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(steps('advanced').scriptStorage.storageApi.properties.allowSharedKeyAccess, false))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(coalesce(steps('advanced').scriptStorage.storageApi.properties.networkAcls.defaultAction, 'Allow'), 'Deny'))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), contains(parse('[\"StorageV2\",\"Storage\",\"FileStorage\"]'), steps('advanced').scriptStorage.storageApi.kind)), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), startsWith(toLower(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), toLower(concat('/subscriptions/', steps('basics').csInfraSubscription.subscriptionId, '/')))), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), not(not(empty(coalesce(steps('advanced').scriptStorage.subnetApi.name, '')))), contains(map(coalesce(steps('advanced').scriptStorage.subnetApi.properties.delegations, parse('[]')), (d) => d.properties.serviceName), 'Microsoft.ContainerInstance/containerGroups')))]",
+                  "visible": "[and(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), not(empty(coalesce(steps('advanced').scriptStorage.storageAccount.id, ''))), not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, ''))), startsWith(toLower(coalesce(steps('advanced').scriptStorage.storageAccount.id, '')), toLower(concat('/subscriptions/', steps('basics').csInfraSubscription.subscriptionId, '/'))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(steps('advanced').scriptStorage.storageApi.properties.allowSharedKeyAccess, false))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(coalesce(steps('advanced').scriptStorage.storageApi.properties.networkAcls.defaultAction, 'Allow'), 'Deny'))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), or(and(startsWith(coalesce(steps('advanced').scriptStorage.storageApi.sku.name, ''), 'Premium_'), equals(coalesce(steps('advanced').scriptStorage.storageApi.kind, ''), 'FileStorage')), and(contains(parse('[\"Standard_LRS\",\"Standard_GRS\",\"Standard_RAGRS\"]'), coalesce(steps('advanced').scriptStorage.storageApi.sku.name, '')), contains(parse('[\"Storage\",\"StorageV2\"]'), coalesce(steps('advanced').scriptStorage.storageApi.kind, ''))), and(contains(parse('[\"Standard_ZRS\",\"Standard_GZRS\",\"Standard_RAGZRS\"]'), coalesce(steps('advanced').scriptStorage.storageApi.sku.name, '')), equals(coalesce(steps('advanced').scriptStorage.storageApi.kind, ''), 'StorageV2')))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(coalesce(steps('advanced').scriptStorage.storageApi.properties.publicNetworkAccess, 'Enabled'), 'Disabled')), not(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')))), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), startsWith(toLower(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), toLower(concat('/subscriptions/', steps('basics').csInfraSubscription.subscriptionId, '/')))), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), contains(toLower(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), '/subnets/')), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), not(empty(coalesce(steps('advanced').scriptStorage.subnetApi.name, '')))), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), not(not(empty(coalesce(steps('advanced').scriptStorage.subnetApi.name, '')))), contains(map(coalesce(steps('advanced').scriptStorage.subnetApi.properties.delegations, parse('[]')), (d) => d.properties.serviceName), 'Microsoft.ContainerInstance/containerGroups')), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), not(not(empty(coalesce(steps('advanced').scriptStorage.vnetApi.location, '')))), equals(toLower(steps('advanced').scriptStorage.vnetApi.location), toLower(steps('basics').resourceScope.location.name))))]",
                   "options": {
                     "style": "Info",
-                    "text": "Storage account meets the deployment script requirements."
+                    "text": "Storage account meets the deployment script requirements the form can check."
                   }
                 }
               ]
@@ -952,7 +996,7 @@
         },
         "falconIpAddresses": "[if(steps('features').enableRealTimeVisibility, filter(split(replace(coalesce(steps('features').falconIps.falconIpAddresses, ''), ' ', ''), ','), (s) => not(empty(s))), parse('[]'))]",
         "deploymentScriptStorageAccountId": "[if(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), coalesce(steps('advanced').scriptStorage.storageAccount.id, ''), '')]",
-        "deploymentScriptSubnetId": "[if(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', ''), '')]"
+        "deploymentScriptSubnetId": "[if(and(and(or(steps('features').enableRealTimeVisibility, steps('features').enableDspm, steps('features').enableVulnerabilityScanning), steps('advanced').useExistingScriptStorage), not(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')))), concat(concat('/subscriptions/', steps('basics').csInfraSubscription.subscriptionId, '/'), substring(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', ''), length(concat('/subscriptions/', steps('basics').csInfraSubscription.subscriptionId, '/')), sub(length(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), length(concat('/subscriptions/', steps('basics').csInfraSubscription.subscriptionId, '/'))))), '')]"
       }
     }
   }

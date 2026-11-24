@@ -5,7 +5,7 @@
     "_generator": {
       "name": "bicep",
       "version": "0.46.1.21595",
-      "templateHash": "6982589192441348211"
+      "templateHash": "12932458610347644146"
     },
     "name": "CrowdStrike Falcon - Deployment Stack Wrapper (MG scope, inline, self-contained)",
     "description": "Creates a management-group-scoped Microsoft.Resources/deploymentStacks that deploys the CrowdStrike management-group engine template inline. Used to TEST the stack-creating UI via a Template Spec with no external hosting.",
@@ -13774,7 +13774,7 @@
     },
     "stackName": "cs-managementgroup-stack",
     "excludedPrincipals": "[if(empty(parameters('azurePrincipalId')), createArray(), createArray(parameters('azurePrincipalId')))]",
-    "useScriptStorage": "[not(empty(parameters('deploymentScriptStorageAccountId')))]",
+    "useScriptStorage": "[if(and(not(empty(parameters('deploymentScriptSubnetId'))), empty(parameters('deploymentScriptStorageAccountId'))), fail('deploymentScriptSubnetId is set but deploymentScriptStorageAccountId is empty: a subnet is only used with an existing storage account.'), if(and(not(empty(parameters('deploymentScriptStorageAccountId'))), not(equals(length(split(parameters('deploymentScriptStorageAccountId'), '/')), 9))), fail('deploymentScriptStorageAccountId must be a storage account resource ID: /subscriptions/<id>/resourceGroups/<rg>/providers/Microsoft.Storage/storageAccounts/<name>'), not(empty(parameters('deploymentScriptStorageAccountId')))))]",
     "scriptStorageIdParts": "[split(parameters('deploymentScriptStorageAccountId'), '/')]"
   },
   "resources": [

@@ -86,18 +86,15 @@ step; a Security Administrator who isn't detected can use the skip checkbox.
 
 ### Management-group variant (tested at Tenant Root Group via Template Spec)
 
-The management-group form runs the same kinds of checks against different scopes, except the
-Global Administrator check, which it doesn't have:
+The management-group form runs the same kinds of checks against different scopes:
 
+* Global Administrator, as above.
 * User Access Administrator, Owner, and Azure Deployment Stack Owner on the selected management
   group.
 * Resource providers and Owner on the **infrastructure subscription**.
 
-All of its blocking rules are on the infrastructure-subscription picker. Without a Global
-Administrator check, a user with no Entra ID admin role (Global Administrator or Security
-Administrator) passes this form, and with real-time visibility on the deployment fails on the
-Entra ID diagnostic setting. It has the same skip checkbox; "Select a management group" is an
-input, so it can't be skipped.
+All of its blocking rules are on the infrastructure-subscription picker. It has the same skip
+checkbox; "Select a management group" is an input, so it can't be skipped.
 
 ### Screenshots
 

@@ -73,7 +73,7 @@ Every check follows the same pattern:
    is unticked by default. Ticking it lifts the rules and shows a warning box; the checks keep
    running and showing their results. It's there for checks that are wrong for a user, such as a
    Security Administrator (CrowdStrike accepts that role for the Entra ID diagnostic setting, but
-   the subscription form only detects Global Administrator), or a lookup that never returns.
+   the forms only detect Global Administrator), or a lookup that never returns.
    Only check rules are wrapped: the management-group form's "Select a management group" rule and
    the input validations on later tabs (Falcon credentials, IP addresses, Object ID, deployment
    script storage) still apply.
@@ -89,7 +89,7 @@ table is the subscription form; the management-group form's checks are listed af
 | Check | API call (as the user) | Passes when | Why it's required |
 |---|---|---|---|
 | Resource providers | `GET /subscriptions/{id}/providers/{namespace}` × 7 | every `registrationState` is `Registered` | ARM doesn't auto-register providers for resources it creates indirectly (deployment scripts create a container instance and storage account). CrowdStrike's registration guide lists them as prerequisites. |
-| Global Administrator (subscription form only) | `GET /providers/microsoft.aadiam/diagnosticSettings` | the response has a `value` | The template creates an Entra ID diagnostic setting. CrowdStrike's guide requires Global Administrator (or Security Administrator) for that. |
+| Global Administrator (both forms) | `GET /providers/microsoft.aadiam/diagnosticSettings` | the response has a `value` | The template creates an Entra ID diagnostic setting. CrowdStrike's guide requires Global Administrator (or Security Administrator) for that. |
 | User Access Administrator | `GET /subscriptions/{id}/providers/Microsoft.Authorization/permissions` | an entry contains both `Microsoft.Authorization/*` and `*/read` | Customer requirement: the role must be assigned itself. Owner doesn't count. |
 | Owner | same call as above | an entry has `actions: ["*"]` with no `notActions` | CrowdStrike's guide requires Owner on the deployment scope. |
 | Azure Deployment Stack Owner | same call as above | an entry contains `Microsoft.Resources/deploymentStacks/*` | CrowdStrike's guide requires this role on the stack's scope, assigned separately. Owner alone isn't enough. |
@@ -103,7 +103,7 @@ skipped.
 
 The **management-group form** checks User Access Administrator, Owner and Azure Deployment Stack
 Owner on the selected management group, and resource providers and Owner on the infrastructure
-subscription. It has **no Global Administrator check**. Its rules sit on the
+subscription, plus the same Global Administrator check. Its rules sit on the
 infrastructure-subscription picker, after an input rule ("Select a management group above.")
 that the skip checkbox doesn't lift.
 
@@ -128,17 +128,13 @@ tenant root, which every subscription inherits, so it passes the UAA check.
 
 A custom role that copies one of these action lists would also pass.
 
-### Why Global Administrator is inferred (subscription form only)
+### Why Global Administrator is inferred
 
-Entra ID roles live in Microsoft Graph, and forms can't call Graph. The subscription form reads
+Entra ID roles live in Microsoft Graph, and forms can't call Graph. Both forms read
 the tenant's Entra ID diagnostic settings instead. That's the same resource the template later
 writes (with real-time visibility on, a tenant-level Entra ID diagnostic setting,
 `modules/log-ingestion/entraLog.bicep`), and the same permission boundary CrowdStrike's
 requirement is about. It's an inference, not a role lookup.
-
-The management-group form doesn't have this check. There, a user without Global Administrator or
-Security Administrator passes the form, and with real-time visibility on the deployment fails on
-the Entra ID diagnostic setting.
 
 ### Which ID the template expects for the CrowdStrike app
 
@@ -276,10 +272,11 @@ To try a form without publishing, paste the built JSON into the
 | UAA check: passes only with the UAA role (after sign-out/in) | ✅ seen in the portal |
 | Owner check | ✅ seen in the portal |
 | Stack Owner check: red without the role, green after assigning it | ✅ seen in the portal |
-| Global Administrator check passes for a GA (subscription form) | ✅ seen in the portal (before the check was removed in `f6e20c3`; the restored check is the same elements and rule) |
+| Global Administrator check passes for a GA (subscription form) | ✅ seen in the portal, before and after restoring it (2026-11-25) |
+| Global Administrator check, management-group form | ⚠️ restored after the 2026-11-25 portal test; its elements and rule are identical to the version tested in the portal before `f6e20c3` (compared by script). Not re-opened in the portal since |
 | Global Administrator check for a **non-GA** user (subscription form) | ✅ seen in the portal (same caveat): the amber "Confirming Global Administrator…" box stays up and Next is blocked. The red "Missing Global Administrator" box never appears, because a denied lookup doesn't return an `error` the form can read |
 | Next / Review + create blocked while any check fails | ✅ seen in the portal |
-| Skip the prerequisite checks: Next allowed with failing or loading checks, warning shown | ⚠️ not yet tested in the portal (generated rules checked offline) |
+| Skip the prerequisite checks: warning shown when ticked | ✅ seen in the portal (2026-11-25). Next with a failing check not exercised, since every check passed for the lab account |
 | End-to-end deployment from the form (stack `succeeded`, 12 managed resources, Event Hub firewall limited to the Falcon cloud's IPs) | ✅ deployed 2026-11-02 |
 | Owner check on monitored subscriptions (`/batch`) | ⚠️ not yet tested (`/batch` didn't work for the GA check in the portal) |
 | Management-group form | ⚠️ never published |
@@ -292,11 +289,9 @@ To try a form without publishing, paste the built JSON into the
 
 ## 8. Known limits
 
-* **Global Administrator is inferred, and only on the subscription form** (section 3). Roles that
-  can read Entra ID diagnostic settings may also pass. CrowdStrike accepts Security Administrator
-  for this step; a Security Administrator who isn't detected has to skip the checks. The
-  management-group form has no Global Administrator check: without an Entra ID admin role its
-  deployment fails at the Entra ID diagnostic setting rather than on the Prerequisites tab.
+* **Global Administrator is inferred** (section 3). Roles that can read Entra ID diagnostic
+  settings may also pass. CrowdStrike accepts Security Administrator for this step; a Security
+  Administrator who isn't detected has to skip the checks.
 * **The checks can be skipped.** With **Skip the prerequisite checks** ticked, nothing on the
   Prerequisites tab or the Scope-tab Owner check blocks Next; a missing provider or role then shows
   up as a failed deployment stack.

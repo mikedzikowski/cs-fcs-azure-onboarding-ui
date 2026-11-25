@@ -67,7 +67,7 @@ def global_admin(step):
     """Global Administrator, inferred from reading tenant-level Entra ID diagnostic settings
     (the resource the template needs that role for). Plain GET: the /batch variant did not
     return a usable result inside the portal.
-    Used by the subscription form only; the management-group form has no Global Administrator check."""
+    Used by both forms (skippable like every other prerequisite check)."""
     out = f"coalesce(steps('{step}').gaCheck, parse('{{}}'))"
     ok = f"contains({out}, 'value')"
     denied = f"contains({out}, 'error')"

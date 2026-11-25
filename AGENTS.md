@@ -87,13 +87,14 @@ Publish a new version number for each change so links to earlier versions keep w
   UAA = actions contain `Microsoft.Authorization/*` and `*/read`; Owner = `*` with no notActions;
   Deployment Stack Owner = `Microsoft.Resources/deploymentStacks/*`. **Owner does not imply the
   other two**; each is checked separately (verified by removing roles from a test account).
-* Global Administrator check: **subscription form only** (`subscription_form()` wires
-  `checks.global_admin("basics")`, elements in order `rp_elems + ga_elems + perm_elems`, rule on the
-  `resourceScope` subscription selector). It's inferred from a plain
-  `GET /providers/microsoft.aadiam/diagnosticSettings` (no Graph from forms). Don't route it through
-  `/batch` (that broke it). For non-admins it stays amber "Confirming…" rather than red. The
-  **management-group form has no GA check**: without Global Administrator or Security
-  Administrator, an MG deployment with real-time visibility fails on the Entra ID diagnostic setting.
+* Global Administrator check: **both forms** (`checks.global_admin("basics")`). Subscription form:
+  elements `rp_elems + ga_elems + perm_elems`, rule on the `resourceScope` subscription selector.
+  Management-group form: elements `ga_elems + mg_perm_elems + ...`, rule on the
+  `csInfraSubscription` selector right after "Select a management group". Skippable like every check.
+  It's inferred from a plain `GET /providers/microsoft.aadiam/diagnosticSettings` (no Graph from
+  forms). Don't route it through `/batch` (that broke it). For non-admins it stays amber
+  "Confirming…" rather than red. (It was removed in `f6e20c3` and restored, subscription first, then
+  management group, on request.)
 * Monitored-subscription Owner check uses ARM `/batch` (names required; >20 requests turn async).
 * Existing deployment-script storage (Advanced tab, `checks.script_storage_section`):
   * The wrapper maps `deploymentScriptStorageAccountId` / `deploymentScriptSubnetId` to the engine's

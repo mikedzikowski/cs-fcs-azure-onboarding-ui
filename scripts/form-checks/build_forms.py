@@ -6,8 +6,8 @@ The create-templatespec-stack*.sh scripts run this before publishing.
 
 Both forms get a first "Prerequisites" tab that checks resource providers and the
 deploying user's permissions, and blocks Next / Review + create until every check passes
-(or the user ticks "Skip the prerequisite checks" at the bottom of that tab). The subscription
-form also checks Global Administrator; the management-group form doesn't.
+(or the user ticks "Skip the prerequisite checks" at the bottom of that tab). Both forms also
+check Global Administrator.
 The CrowdStrike service principal object ID (with an InfoBox on which ID to use) and, for
 subscription scope, the subscriptions to monitor move to a second "Scope" tab.
 """
@@ -300,6 +300,7 @@ def management_group_form():
     mg = "last(split(coalesce(steps('basics').resourceScope.managementGroup.id, ''), '/'))"
     infra = "steps('basics').csInfraSubscription.subscriptionId"
 
+    ga_elems, ga_ok = checks.global_admin("basics")
     # Owner on the management group is inherited by every subscription under it, so it
     # covers all monitored subscriptions without a per-subscription call.
     mg_perm_elems, mg_perm = checks.permissions(
@@ -334,6 +335,7 @@ def management_group_form():
                 {"isValid": f"[not(empty({mg}))]", "message": "Select a management group above."},
             ] + [
                 {"isValid": f"[{checks.or_skipped(ok)}]", "message": msg} for ok, msg in [
+                    (ga_ok, "Global Administrator is required (or is still being checked). See the Global Administrator message below."),
                     (mg_perm["uaa"], "User Access Administrator is required on the management group (or is still being checked). See the message below."),
                     (mg_perm["owner"], "Owner is required on the management group (or is still being checked). See the Owner message below."),
                     (mg_perm["stack"], "Azure Deployment Stack Owner is required on the management group (or is still being checked). See the message below."),
@@ -341,7 +343,7 @@ def management_group_form():
                     (infra_perm["owner"], "Owner is required on the infrastructure subscription (or is still being checked). See the Owner message below."),
                 ]]},
         }),
-    ] + dumps(mg_perm_elems + rp_elems + infra_perm_elems + checks.skip_checks())
+    ] + dumps(ga_elems + mg_perm_elems + rp_elems + infra_perm_elems + checks.skip_checks())
 
     # Subscriptions outside the selected management group can be added (the engine's
     # subscriptionIds), with the same Owner check as the subscription form.

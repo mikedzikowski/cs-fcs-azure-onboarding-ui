@@ -34,7 +34,7 @@ deprovisioning steps use (one stack per scope).
 
 | Path | What it is | Edit? |
 |---|---|---|
-| `crowdstrike-fcs-azure-bicep-generated/` | CrowdStrike's public engine (`cs-deployment-subscription.bicep`, `cs-deployment-management-group.bicep`, modules, PowerShell callback scripts). Upstream: `github.com/CrowdStrike/bicep-azure-cloud-registration`. | **No.** Replace the folder wholesale when a new bundle ships. |
+| `crowdstrike-fcs-azure-bicep-generated/` | CrowdStrike's public engine (`cs-deployment-subscription.bicep`, `cs-deployment-management-group.bicep`, modules, PowerShell callback scripts). Upstream: `github.com/CrowdStrike/azure-bicep-cloud-registration`. | **No.** Replace the folder wholesale when a new bundle ships. |
 | `stacks/stackWrapper.inline.{subscription,managementGroup}.bicep` | Wrapper: declares the deployment stack, inlines the compiled engine via `loadJsonContent('../dist/...')`, passes form outputs through as engine parameters. | Yes, keep the two in step. |
 | `ui/base/uiFormDefinition.templatespec*.json` | Hand-written form source (CrowdStrike, Features, Advanced tabs). | Yes. |
 | `scripts/form-checks/checks.py` | Builders for the checks (providers, GA, UAA/Owner/Stack Owner, storage policy, monitored-subscription Owner), the skip-checks option, the passed-box style, the Falcon IP field and the deployment-script storage section. | Yes. |
@@ -42,7 +42,7 @@ deprovisioning steps use (one stack per scope).
 | `ui/uiFormDefinition.templatespec*.json` | **Generated** forms. | No, regenerate. |
 | `deploy/` | **Generated** button payload: compiled wrappers + forms with stable names. Served publicly from raw GitHub. | No, regenerate with `make-deploy-button.sh --stage`. |
 | `scripts/create-templatespec-stack.sh`, `...-stack-mg.sh` | Build forms → `az bicep build` engine → build wrapper → publish a Template Spec version. | |
-| `scripts/make-deploy-button.sh` | `--stage` copies build output into `deploy/` and **scans it** (refuses on non-allowlisted GUIDs, 32-hex strings, 12-digit numbers, key/SAS material). Without `--stage` prints button Markdown for a base URL. | |
+| `scripts/make-deploy-button.sh` | `--stage` copies build output into `deploy/` and **scans it** (refuses on GUIDs other than the allowlisted built-in role and policy IDs, 32-hex strings, 12-digit numbers, key/SAS material). Without `--stage` prints button Markdown for a base URL. | |
 | `docs/prereq-checker.md` | Design and verification notes for every check. Keep it accurate when checks change. | Yes. |
 | `docs/parameters.md` | Parameter reference. | Yes. |
 | `docs/images/` | Screenshots used by README (IDs zeroed, a subscription name blurred). | Only with sanitised images. |
@@ -85,7 +85,7 @@ Publish a new version number for each change so links to earlier versions keep w
   * New check rules must be wrapped with `or_skipped()`.
   * Don't set `defaultValue` on a CheckBox: the 2021-09-09 schema doesn't allow it (unchecked
     already outputs false). `isInitialRegistration` in `ui/base` predates this and still has one.
-  * Not yet tested in the portal; the generated rules are checked offline only.
+  * Seen in the portal (warning when ticked). Continuing past a failing check hasn't been exercised.
 * Role detection uses `GET {scope}/providers/Microsoft.Authorization/permissions`:
   UAA = actions contain `Microsoft.Authorization/*` and `*/read`; Owner = `*` with no notActions;
   Deployment Stack Owner = `Microsoft.Resources/deploymentStacks/*`. **Owner does not imply the
@@ -176,10 +176,10 @@ There is no unit-test suite. Changes are verified by:
    `view.outputs` with the inputs you entered, check them against the Review + create summary, and
    deploy the served wrapper with those parameters from the CLI. That's how the 2026-11-25
    end-to-end tests were run. Pass secrets on the command line only; never write them to a file.
-4. Offline checks used so far (kept outside the repo): a small evaluator for the Form view expression
+3. Offline checks used so far (kept outside the repo): a small evaluator for the Form view expression
    subset to run every `isValid`/`visible` rule against simulated portal states, and a JSON-schema
    validation against the published 2021-09-09 schema.
-3. For button changes: push, confirm the raw URLs return 200 with `access-control-allow-origin: *`,
+4. For button changes: push, confirm the raw URLs return 200 with `access-control-allow-origin: *`,
    then open both buttons.
 
 Known gotchas when testing:

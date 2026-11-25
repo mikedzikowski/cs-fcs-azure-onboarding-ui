@@ -170,6 +170,10 @@ STORAGE_POLICIES = {
     "34c877ad-507e-4c82-993e-3452a6e0ad3c": "Storage accounts should restrict network access",
     "f0308946-498a-43fd-8d44-a75b47cd2aef": "Storage accounts should restrict network access (excluding ARO)",
     "4fa4b6c0-31ca-4c0d-b10d-24b96f62a751": "Storage account public access should be disallowed",
+    # The one CrowdStrike's README names ("Deployment fails because the auto-created deployment
+    # script storage account violates policy"): the script service's account has public network
+    # access enabled.
+    "b2982f36-99f2-4db5-8eff-283140c09693": "Storage accounts should disable public network access",
 }
 POLICY_EXEMPTION_DOCS = "https://learn.microsoft.com/azure/governance/policy/concepts/exemption-structure"
 
@@ -191,7 +195,7 @@ def storage_policy_info(step, sub, where):
             f"Checking Azure Policy assignments on the {where} for storage policies that can block the deployment... "
             "If this message does not clear, your account could not read policy assignments (this check doesn't block)."),
         passed("storagePolicyNone", f"and({loaded}, empty({matching}))",
-            f"No storage network-access or public-access policy is assigned to the {where} or above it."),
+            f"No blocking storage policy (public network access, public access or network access) is assigned to the {where} or above it."),
         box("storagePolicyFound", f"and({loaded}, not(empty({matching})))", "Warning",
             f"[concat('Storage policy assigned: ', {first_name}, if(greater(length({matching}), 1), concat(' (and ', string(sub(length({matching}), 1)), ' more)'), ''), "
             "'. If it is set to Deny, it blocks the storage account the CrowdStrike deployment scripts create, and the deployment fails. "

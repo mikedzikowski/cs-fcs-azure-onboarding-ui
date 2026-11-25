@@ -186,7 +186,7 @@ CrowdStrike app got no roles, and Falcon couldn't complete validation.
 **How the form makes the ID visible:**
 
 1. **Entry.** The label and the help box say which ID to use, and how to find it.
-2. **Echo.** Under the field, the form shows "Azure roles will be assigned to principal ID
+2. **Echo.** Under the field, the form shows "Roles will be assigned to principal ID
    `<value>`", to compare against the enterprise application's Overview page.
 3. **After deployment.** To confirm which principal the stack actually used, and that it's
    the current one:
@@ -283,7 +283,7 @@ To try a form without publishing, paste the built JSON into the
 | Skip the prerequisite checks: warning shown when ticked | ✅ seen in the portal (2026-11-25). Next with a failing check not exercised, since every check passed for the lab account |
 | End-to-end deployment from the form (stack `succeeded`, 12 managed resources, Event Hub firewall limited to the Falcon cloud's IPs) | ✅ deployed 2026-11-02 |
 | Owner check on monitored subscriptions (`/batch`) | ⚠️ not yet tested (`/batch` didn't work for the GA check in the portal) |
-| Management-group form | ⚠️ never published |
+| Management-group form | ✅ published as a Template Spec and served from the button; deployed at Tenant Root Group |
 | Existing storage account for deployment scripts: CrowdStrike's engine script | ✅ 2026-11-24, lab tenant: CrowdStrike's `cs-deployment-scope-mg.bicep` (scope lookup; no Falcon call) ran its deployment script on an existing storage account, once with a key and once with a delegated subnet + `Microsoft.Storage` service endpoint and no key. Share created in the chosen account; no auto-created storage account |
 | Existing storage account: wrappers | ✅ ARM preflight passes at both scopes with the option off, key path and subnet path; the wrapper's `fail()` guards reject a subnet without a storage account and a malformed storage account ID |
 | Existing storage account: form rules | ✅ 2026-11-25, portal (both forms): blocks shared key off, firewall Deny, StorageV2 + Premium, public access disabled without a subnet, an undelegated subnet, a VNet in another region, a non-subnet ID, and a subnet that doesn't exist; passes a compliant account (key path, with the key warning) and a private account + delegated same-region subnet. Option hidden for DSPM-only on the subscription form, shown on the management-group form |

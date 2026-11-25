@@ -93,6 +93,7 @@ table is the subscription form; the management-group form's checks are listed af
 | User Access Administrator | `GET /subscriptions/{id}/providers/Microsoft.Authorization/permissions` | an entry contains both `Microsoft.Authorization/*` and `*/read` | Customer requirement: the role must be assigned itself. Owner doesn't count. |
 | Owner | same call as above | an entry has `actions: ["*"]` with no `notActions` | CrowdStrike's guide requires Owner on the deployment scope. |
 | Azure Deployment Stack Owner | same call as above | an entry contains `Microsoft.Resources/deploymentStacks/*` | CrowdStrike's guide requires this role on the stack's scope, assigned separately. Owner alone isn't enough. |
+| Storage policy (**information only, never blocks**) | `GET /subscriptions/{id}/providers/Microsoft.Authorization/policyAssignments?api-version=2023-04-01&$filter=atScope()` (includes assignments inherited from management groups and tenant root) | no assignment of built-in `34c877ad-…` *Storage accounts should restrict network access*, `f0308946-…` (its ARO variant) or `4fa4b6c0-…` *Storage account public access should be disallowed*; otherwise a warning names it | The deployment script service creates a storage account with no firewall and blob public access on; with those policies on **Deny** Azure rejects it and the deployment fails. The fix is an existing storage account (Advanced tab) or a policy exemption on the CrowdStrike resource group. Matched by definition ID; the effect and enforcement mode aren't read |
 
 The seven providers are Microsoft.Management, ContainerInstance, Storage, Resources, Insights,
 PolicyInsights and EventHub.
@@ -103,7 +104,8 @@ skipped.
 
 The **management-group form** checks User Access Administrator, Owner and Azure Deployment Stack
 Owner on the selected management group, and resource providers and Owner on the infrastructure
-subscription, plus the same Global Administrator check. Its rules sit on the
+subscription, plus the same Global Administrator check and storage policy check (on the
+infrastructure subscription, where the scripts run). Its rules sit on the
 infrastructure-subscription picker, after an input rule ("Select a management group above.")
 that the skip checkbox doesn't lift.
 
@@ -276,6 +278,8 @@ To try a form without publishing, paste the built JSON into the
 | Global Administrator check, management-group form | ⚠️ restored after the 2026-11-25 portal test; its elements and rule are identical to the version tested in the portal before `f6e20c3` (compared by script). Not re-opened in the portal since |
 | Global Administrator check for a **non-GA** user (subscription form) | ✅ seen in the portal (same caveat): the amber "Confirming Global Administrator…" box stays up and Next is blocked. The red "Missing Global Administrator" box never appears, because a denied lookup doesn't return an `error` the form can read |
 | Next / Review + create blocked while any check fails | ✅ seen in the portal |
+| Storage policy check (both forms) | ✅ 2026-11-25, portal: with the built-in *Storage account public access should be disallowed* assigned (Audit and Deny), the warning names it and "(and 1 more)"; Next stays available. Offline: loading, empty list, no matching assignment and matching assignment each show the right box |
+| Passed checks shown green | ✅ 2026-11-25, portal: InfoBox style `None` + ✅ renders as a plain box with a green check mark (both forms) |
 | Skip the prerequisite checks: warning shown when ticked | ✅ seen in the portal (2026-11-25). Next with a failing check not exercised, since every check passed for the lab account |
 | End-to-end deployment from the form (stack `succeeded`, 12 managed resources, Event Hub firewall limited to the Falcon cloud's IPs) | ✅ deployed 2026-11-02 |
 | Owner check on monitored subscriptions (`/batch`) | ⚠️ not yet tested (`/batch` didn't work for the GA check in the portal) |
@@ -288,6 +292,11 @@ To try a form without publishing, paste the built JSON into the
 | Portal **Create** button | ⚠️ in an automated browser, Review + create never finished final validation (Create stayed disabled) for both this branch and `main`; the same parameters validate and deploy from the CLI. Not reproduced by a person yet |
 
 ## 8. Known limits
+
+* **The storage policy check only looks for the assignment.** It doesn't read the effect (Audit or
+  Deny), the enforcement mode, exemptions or `notScopes`, and only knows the three built-in
+  definitions. A custom policy, or one of these inside a custom initiative, isn't detected.
+  Microsoft notes a new or changed Deny assignment can take about 30 minutes to start denying.
 
 * **Global Administrator is inferred** (section 3). Roles that can read Entra ID diagnostic
   settings may also pass. CrowdStrike accepts Security Administrator for this step; a Security

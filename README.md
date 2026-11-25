@@ -75,6 +75,7 @@ A form can't run code. The checker uses only what the portal gives a form:
 | User Access Administrator | `GET .../providers/Microsoft.Authorization/permissions` | an entry has both `Microsoft.Authorization/*` and `*/read` |
 | Owner | same call | an entry has `*` and no `notActions` |
 | Azure Deployment Stack Owner | same call | an entry has `Microsoft.Resources/deploymentStacks/*` |
+| Storage policy (**information only**) | `GET /subscriptions/{id}/providers/Microsoft.Authorization/policyAssignments?$filter=atScope()` | shows a warning if the built-in storage policies **Storage accounts should restrict network access** (or its Azure Red Hat OpenShift variant) and **Storage account public access should be disallowed** is assigned to the subscription or above it (tenant root, management group). Never blocks |
 | Owner on monitored subscriptions (Scope tab) | one ARM `/batch` call across the "Subscriptions to monitor" list | Owner on each one (**not yet tested in the portal**) |
 
 Each role is detected by an action list that only its built-in definition has. Owner alone
@@ -84,6 +85,18 @@ the template later writes (with real-time visibility on, a tenant-level Entra ID
 setting). It isn't a role lookup. CrowdStrike's guide also accepts Security Administrator for that
 step; a Security Administrator who isn't detected can use the skip checkbox.
 
+**Storage policy check.** The CrowdStrike deployment scripts run in an Azure Container Instance, and
+the script service creates its own storage account for them, with no firewall and blob public
+access left on. With one of those storage policies set to **Deny**, Azure rejects that account and
+the deployment fails. The check looks for an assignment of the policy (matched by the built-in
+definition ID, so the assignment's name doesn't matter) and, if it finds one, recommends using an
+existing storage account for the deployment scripts (Advanced tab) or a policy exemption for the
+CrowdStrike resource group. It only reports; it doesn't block Next, and it doesn't read the effect
+or the enforcement mode.
+
+**Passed checks** show a green check mark (✅) in a plain box. Azure's form schema has no green
+style (only Info, Warning, Error and None), so the mark is part of the text.
+
 ### Management-group variant (tested at Tenant Root Group via Template Spec)
 
 The management-group form runs the same kinds of checks against different scopes:
@@ -91,7 +104,8 @@ The management-group form runs the same kinds of checks against different scopes
 * Global Administrator, as above.
 * User Access Administrator, Owner, and Azure Deployment Stack Owner on the selected management
   group.
-* Resource providers and Owner on the **infrastructure subscription**.
+* Resource providers, Owner and the storage policy check on the **infrastructure subscription**
+  (where the deployment scripts run).
 
 All of its blocking rules are on the infrastructure-subscription picker. It has the same skip
 checkbox; "Select a management group" is an input, so it can't be skipped.

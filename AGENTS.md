@@ -14,8 +14,9 @@ run `az stack ...`" flow.
 * A thin **stack wrapper** (`stacks/`) deploys that engine inside a
   `Microsoft.Resources/deploymentStacks` resource.
 * A **portal form** (`uiFormDefinition`, Form view schema 2021-09-09) adds a *Prerequisites* tab
-  that checks resource providers and the user's roles and blocks Next until they pass, then
-  collects only the inputs that apply.
+  that checks resource providers, the user's roles and blocking storage policies, and blocks Next
+  until the role/provider checks pass (or the user skips them), then collects only the inputs that
+  apply, including an optional existing storage account for the deployment scripts.
 * Two delivery options, same files:
   * **Template Spec**: `az ts create --template-file <wrapper.json> --ui-form-definition <form.json>`.
   * **Deploy to Azure button**: the compiled JSON in `deploy/` served from raw GitHub, opened with
@@ -25,7 +26,9 @@ run `az stack ...`" flow.
     checks, so the repo deliberately doesn't offer it.
     The button needs ARM JSON; it can't load remote Bicep.
 
-Two scopes, kept at parity: **subscription** and **management group / tenant root**.
+Two scopes, kept at parity: **subscription** and **management group / tenant root**. The wrapper
+names the stack `cs-subscription-stack` / `cs-managementgroup-stack`, the fixed names CrowdStrike's
+deprovisioning steps use (one stack per scope).
 
 ## Layout
 
@@ -34,7 +37,7 @@ Two scopes, kept at parity: **subscription** and **management group / tenant roo
 | `crowdstrike-fcs-azure-bicep-generated/` | CrowdStrike's public engine (`cs-deployment-subscription.bicep`, `cs-deployment-management-group.bicep`, modules, PowerShell callback scripts). Upstream: `github.com/CrowdStrike/bicep-azure-cloud-registration`. | **No.** Replace the folder wholesale when a new bundle ships. |
 | `stacks/stackWrapper.inline.{subscription,managementGroup}.bicep` | Wrapper: declares the deployment stack, inlines the compiled engine via `loadJsonContent('../dist/...')`, passes form outputs through as engine parameters. | Yes, keep the two in step. |
 | `ui/base/uiFormDefinition.templatespec*.json` | Hand-written form source (CrowdStrike, Features, Advanced tabs). | Yes. |
-| `scripts/form-checks/checks.py` | Builders for the checks (providers, GA, UAA/Owner/Stack Owner, monitored-subscription Owner), the skip-checks option, the Falcon IP field and the deployment-script storage section. | Yes. |
+| `scripts/form-checks/checks.py` | Builders for the checks (providers, GA, UAA/Owner/Stack Owner, storage policy, monitored-subscription Owner), the skip-checks option, the passed-box style, the Falcon IP field and the deployment-script storage section. | Yes. |
 | `scripts/form-checks/build_forms.py` | Builds `ui/uiFormDefinition.templatespec*.json` from `ui/base/` + `checks.py`: adds the Prerequisites and Scope tabs, rebuilds the shared CrowdStrike/Features tabs identically for both forms, rewrites outputs. | Yes. |
 | `ui/uiFormDefinition.templatespec*.json` | **Generated** forms. | No, regenerate. |
 | `deploy/` | **Generated** button payload: compiled wrappers + forms with stable names. Served publicly from raw GitHub. | No, regenerate with `make-deploy-button.sh --stage`. |
@@ -95,6 +98,16 @@ Publish a new version number for each change so links to earlier versions keep w
   forms). Don't route it through `/batch` (that broke it). For non-admins it stays amber
   "Confirming…" rather than red. (It was removed in `f6e20c3` and restored, subscription first, then
   management group, on request.)
+* Storage policy check (`checks.storage_policy_info`, both forms, Prerequisites tab): one GET of
+  `policyAssignments?$filter=atScope()` on the deployment / infrastructure subscription (inherited
+  assignments included). Looks only for an assignment of the built-in IDs in `STORAGE_POLICIES`
+  (restrict network access + its ARO variant, public access disallowed). **Information only, by
+  request: no validation rule, never blocks Next**; the warning recommends an existing storage
+  account or a policy exemption. "Loaded" is `contains(response, 'value')` (an empty list is a real
+  answer). The three definition IDs are in `make-deploy-button.sh`'s GUID allowlist. Verified in the
+  portal 2026-11-25 with the public-access policy assigned (Audit and Deny).
+* Passed checks: `checks.passed()` = InfoBox style `None` + "✅ " prefix. The 2021-09-09 schema has no
+  green/success style (Info, Warning, Error, None only). Verified in the portal.
 * Monitored-subscription Owner check uses ARM `/batch` (names required; >20 requests turn async).
 * Existing deployment-script storage (Advanced tab, `checks.script_storage_section`):
   * The wrapper maps `deploymentScriptStorageAccountId` / `deploymentScriptSubnetId` to the engine's
@@ -153,10 +166,19 @@ There is no unit-test suite. Changes are verified by:
    (`https://schema.management.azure.com/schemas/2021-09-09/uiFormDefinition.schema.json`, e.g. with
    Python `jsonschema`). Two known, already-deployed exceptions: `isInitialRegistration`'s CheckBox
    `defaultValue` and the existing-Event-Hub selector's `options.filter`. Anything else is new.
-2. Publishing a new Template Spec version to a lab subscription and driving the form in the portal:
-   every check in pass and fail states, then Review + create, then **Create**, then watching the stack:
-   `az stack sub show -n <stack>` or `az stack mg show --management-group-id <mg> -n <stack>`.
+2. Driving the form in the portal (Template Spec, or the button URL pinned to a commit SHA so the
+   5-minute raw-GitHub cache can't serve an old copy): every check in pass and fail states, then
+   Review + create, then **Create**, then watching the stack:
+   `az stack sub show -n cs-subscription-stack` or
+   `az stack mg show --management-group-id <mg> -n cs-managementgroup-stack`.
    The deployment script logs (callbacks to Falcon) live in the stack's resource group.
+   If **Create** won't enable (seen in automated browsers), evaluate the served form's
+   `view.outputs` with the inputs you entered, check them against the Review + create summary, and
+   deploy the served wrapper with those parameters from the CLI. That's how the 2026-11-25
+   end-to-end tests were run. Pass secrets on the command line only; never write them to a file.
+4. Offline checks used so far (kept outside the repo): a small evaluator for the Form view expression
+   subset to run every `isValid`/`visible` rule against simulated portal states, and a JSON-schema
+   validation against the published 2021-09-09 schema.
 3. For button changes: push, confirm the raw URLs return 200 with `access-control-allow-origin: *`,
    then open both buttons.
 
@@ -170,6 +192,15 @@ Known gotchas when testing:
 * The Falcon callback can return 409 ("Registration status invalid") depending on the tenant's
   registration state in Falcon and the *Initial registration* flag. That's a CrowdStrike-side
   behaviour, not a form bug.
+* Raw GitHub caches each file ~5 minutes (`cache-control: max-age=300`): after a push, `main` can
+  still serve the old form. Use the commit SHA in the URL to check, or wait.
+* A new or changed Deny policy assignment can take ~30 minutes to start denying (Microsoft). A
+  deployment right after assigning one may still succeed.
+* The portal can restore a form's earlier selections (for example a ticked skip checkbox) after a
+  reload in the same session. Re-check the Prerequisites tab before concluding anything.
+* `deleteAll` on a stack removes `rg-cs-<env>`, but not the diagnostic settings the stack didn't
+  manage (`cs-aad-to-eventhub`, `cs-monitor-activity-to-eventhub`); CrowdStrike's deprovisioning
+  script removes those.
 
 **Verify, don't assume.** Ground role, provider and portal-behaviour claims in Microsoft/CrowdStrike
 docs, the Bicep source, or a test. Several "obvious" assumptions here turned out wrong (Owner

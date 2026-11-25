@@ -37,6 +37,22 @@ def box(name, visible, style, text, uri=None):
     return {"name": name, "type": "Microsoft.Common.InfoBox", "visible": f"[{visible}]", "options": opts}
 
 
+# A passed check. Form view InfoBox styles are only Info (blue), Warning, Error and None (schema
+# 2021-09-09); there is no green/success style. So a pass uses style None (no blue box) and starts
+# with a green check mark. Change it here to restyle every passed box.
+PASS_STYLE = "None"
+PASS_MARK = "\u2705 "
+
+
+def passed(name, visible, text, uri=None):
+    """InfoBox for a check that passed: green check mark, no blue box."""
+    if text.startswith("[") and text.endswith("]"):
+        text = f"[concat('{PASS_MARK}', {text[1:-1]})]"
+    else:
+        text = PASS_MARK + text
+    return box(name, visible, PASS_STYLE, text, uri)
+
+
 def arm_get(name, path):
     return {"name": name, "type": "Microsoft.Solutions.ArmApiControl", "request": {"method": "GET", "path": path}}
 
@@ -54,7 +70,7 @@ def providers(step, sub, where):
     ] + [
         box("rpCheckPending", f"and(not({loaded}), not({any_missing}))", "Info",
             f"Checking resource provider registration in the {where}... If this message does not clear, the check could not run - verify manually with: az provider show --namespace <namespace> --query registrationState"),
-        box("rpCheckPassed", f"and({loaded}, not({any_missing}))", "Info",
+        passed("rpCheckPassed", f"and({loaded}, not({any_missing}))",
             f"All resource providers enabled - every required resource provider is registered in the {where}."),
         box("rpCheckMissing", f"{any_missing}", "Error",
             f"[concat('Missing resource providers - please enable them in the {where} before deploying, or the deployment stack will fail:  ', {missing_list}, ' Register each with: az provider register --namespace <namespace> --subscription ', {sub}, ' --wait   then reload this form.')]",
@@ -75,7 +91,7 @@ def global_admin(step):
         arm_get("gaCheck", "/providers/microsoft.aadiam/diagnosticSettings?api-version=2017-04-01"),
         box("gaCheckPending", f"and(not({ok}), not({denied}))", "Warning",
             "Confirming Global Administrator... If this message does not change to 'confirmed' within a few seconds, your account could not read Entra ID diagnostic settings, which requires Global Administrator. Assign or activate the role (PIM), then sign out of the Azure portal, sign back in and reopen this form (role changes can take up to 10 minutes to apply)."),
-        box("gaCheckPassed", ok, "Info",
+        passed("gaCheckPassed", ok,
             "Global Administrator confirmed (able to read Entra ID diagnostic settings)."),
         box("gaCheckMissing", denied, "Error",
             "Missing Global Administrator - you need the Global Administrator role in Entra ID to configure Entra ID log export. Assign or activate the role (PIM), then sign out of the Azure portal, sign back in and reopen this form (role changes can take up to 10 minutes to apply).",
@@ -120,10 +136,10 @@ def permissions(step, ctl, scope_path, where, prefix, gate=None, checks=("uaa", 
     ]
     oks = {}
     for c in checks:
-        passed, missing, uri = text[c]
+        ok_text, missing, uri = text[c]
         name = f"{prefix}{c.capitalize()}"
         elements += [
-            box(f"{name}Passed", f"and({loaded}, {has[c]})", "Info", passed),
+            passed(f"{name}Passed", f"and({loaded}, {has[c]})", ok_text),
             box(f"{name}Missing", f"and({loaded}, not({has[c]}))", "Error", missing, uri),
         ]
         oks[c] = f"and({loaded}, {has[c]})"
@@ -139,12 +155,51 @@ def management_group_exists(step, mg):
         arm_get("mgLookup", f"[concat('/providers/Microsoft.Management/managementGroups/', {mg}, '?api-version=2023-04-01')]"),
         box("mgLookupPending", f"and(not(empty({mg})), not({ok}))", "Warning",
             f"[concat('Looking up management group ', {mg}, '... If this message does not clear, the management group does not exist or your account cannot read it. Use the management group ID, not its display name.')]"),
-        box("mgLookupPassed", ok, "Info", f"[concat('Management group ', {mg}, ' found.')]"),
+        passed("mgLookupPassed", ok, f"[concat('Management group ', {mg}, ' found.')]"),
     ]
     return elements, ok
 
 
 SKIPPED = "steps('basics').skipChecks"
+
+
+# Built-in storage policies that block the storage account the deployment script service creates
+# (it has no firewall and doesn't set allowBlobPublicAccess=false). Information only: never blocks
+# Next. Matched by definition ID, so the assignment's display name doesn't matter.
+STORAGE_POLICIES = {
+    "34c877ad-507e-4c82-993e-3452a6e0ad3c": "Storage accounts should restrict network access",
+    "f0308946-498a-43fd-8d44-a75b47cd2aef": "Storage accounts should restrict network access (excluding ARO)",
+    "4fa4b6c0-31ca-4c0d-b10d-24b96f62a751": "Storage account public access should be disallowed",
+}
+POLICY_EXEMPTION_DOCS = "https://learn.microsoft.com/azure/governance/policy/concepts/exemption-structure"
+
+
+def storage_policy_info(step, sub, where):
+    """Information-only check: is one of STORAGE_POLICIES assigned to `sub` (an expression), directly
+    or inherited from a management group / tenant root (atScope())? Never blocks Next."""
+    api = f"steps('{step}').storagePolicyApi"
+    # The list API always returns a `value` array, even when it's empty, so "loaded" is "the
+    # response has a value key" (an empty list is a real answer), not "the list is non-empty".
+    loaded = f"contains(coalesce({api}, parse('{{}}')), 'value')"
+    ids = "[" + ",".join(f'"{i}"' for i in STORAGE_POLICIES) + "]"
+    matching = (f"filter(coalesce({api}.value, parse('[]')), "
+                f"(a) => contains(parse('{ids}'), last(split(a.properties.policyDefinitionId, '/'))))")
+    first_name = f"coalesce(first({matching}).properties.displayName, first({matching}).name)"
+    elements = [
+        arm_get("storagePolicyApi", f"[concat('/subscriptions/', {sub}, '/providers/Microsoft.Authorization/policyAssignments?api-version=2023-04-01&$filter=atScope()')]"),
+        box("storagePolicyPending", f"not({loaded})", "Info",
+            f"Checking Azure Policy assignments on the {where} for storage policies that can block the deployment... "
+            "If this message does not clear, your account could not read policy assignments (this check doesn't block)."),
+        passed("storagePolicyNone", f"and({loaded}, empty({matching}))",
+            f"No storage network-access or public-access policy is assigned to the {where} or above it."),
+        box("storagePolicyFound", f"and({loaded}, not(empty({matching})))", "Warning",
+            f"[concat('Storage policy assigned: ', {first_name}, if(greater(length({matching}), 1), concat(' (and ', string(sub(length({matching}), 1)), ' more)'), ''), "
+            "'. If it is set to Deny, it blocks the storage account the CrowdStrike deployment scripts create, and the deployment fails. "
+            "To avoid that, use an existing storage account for the deployment scripts (Advanced tab), or create a policy exemption for the "
+            "CrowdStrike resource group before deploying. This check does not block Next.')]",
+            POLICY_EXEMPTION_DOCS),
+    ]
+    return elements
 
 
 def skip_checks():
@@ -199,10 +254,10 @@ def monitored_owner(step, ids, exclude_sub, none_text=NONE_SUB):
                 },
             },
         },
-        box("ownerMonNone", f"equals({count}, 0)", "Info", none_text),
+        passed("ownerMonNone", f"equals({count}, 0)", none_text),
         box("ownerMonPending", f"and(greater({count}, 0), not({loaded}))", "Info",
             "Checking Owner on the subscriptions to monitor... If this message does not clear, the check could not run - it supports up to 20 subscriptions, in this tenant, with no duplicates."),
-        box("ownerMonPassed", f"and(greater({count}, 0), {loaded}, empty({failing}))", "Info",
+        passed("ownerMonPassed", f"and(greater({count}, 0), {loaded}, empty({failing}))",
             "Owner confirmed on every subscription to monitor."),
         box("ownerMonMissing", f"and(greater({count}, 0), {loaded}, not(empty({failing})))", "Error",
             f"[concat('Missing Owner permissions - you need Owner on every subscription CrowdStrike will monitor. Missing or not accessible on:  ', string({failing}), '  Assign Owner (or activate it in PIM), then sign out of the Azure portal, sign back in and reopen this form (role changes can take up to 10 minutes to apply).')]",
@@ -368,7 +423,7 @@ def script_storage_section(step, infra, location, enabled):
                  "Without a subnet, the deployment looks up this storage account's access key and passes it to the CrowdStrike template. "
                  "It is then readable in the deployment stack's parameters by anyone who can read the stack. Enter a delegated subnet "
                  "to avoid passing a key, or rotate the key after deploying."),
-             box("scriptStorageOk", f"and({on}, not(empty({sa_id})), {sa_loaded}, " + ", ".join(ok for ok, _ in sa_rules + subnet_rules) + ")", "Info",
+             passed("scriptStorageOk", f"and({on}, not(empty({sa_id})), {sa_loaded}, " + ", ".join(ok for ok, _ in sa_rules + subnet_rules) + ")",
                  "Storage account meets the deployment script requirements the form can check."),
          ]},
     ]

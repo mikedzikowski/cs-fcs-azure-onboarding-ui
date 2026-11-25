@@ -61,9 +61,14 @@ FILES=(
 ALLOWED_GUIDS="acdd72a7-3385-48ef-bd42-f606fba81ae7 69566ab7-960f-475b-8e7c-b3118f30c6bd
 a638d3c7-ab3a-418d-83e6-5f17a39d4fde 4633458b-17de-408a-b874-0445c86b69e6
 749f88d5-cbae-40b8-bcfc-e573ddc772fa f526a384-b230-433a-b45c-95f59c4a2dec
+34c877ad-507e-4c82-993e-3452a6e0ad3c f0308946-498a-43fd-8d44-a75b47cd2aef
+4fa4b6c0-31ca-4c0d-b10d-24b96f62a751
 00000000-0000-0000-0000-000000000000"
 # Reader, Storage File Data Privileged Contributor, Azure Event Hubs Data Receiver,
-# Key Vault Secrets User, Monitoring Contributor, Azure Event Hubs Data Owner, placeholder.
+# Key Vault Secrets User, Monitoring Contributor, Azure Event Hubs Data Owner; then the built-in
+# Azure Policy definitions the storage-policy check looks for ("Storage accounts should restrict
+# network access", its ARO variant, "Storage account public access should be disallowed");
+# placeholder.
 
 scan() {  # scan FILE... ; non-zero exit on findings
   local bad=0 f g

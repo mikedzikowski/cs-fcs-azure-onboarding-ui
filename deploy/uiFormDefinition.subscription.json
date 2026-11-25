@@ -137,8 +137,8 @@
               "type": "Microsoft.Common.InfoBox",
               "visible": "[and(and(not(empty(steps('basics').rpManagement.registrationState)), not(empty(steps('basics').rpContainerInstance.registrationState)), not(empty(steps('basics').rpStorage.registrationState)), not(empty(steps('basics').rpResources.registrationState)), not(empty(steps('basics').rpInsights.registrationState)), not(empty(steps('basics').rpPolicyInsights.registrationState)), not(empty(steps('basics').rpEventHub.registrationState))), not(or(and(not(empty(steps('basics').rpManagement.registrationState)), not(equals(steps('basics').rpManagement.registrationState, 'Registered'))), and(not(empty(steps('basics').rpContainerInstance.registrationState)), not(equals(steps('basics').rpContainerInstance.registrationState, 'Registered'))), and(not(empty(steps('basics').rpStorage.registrationState)), not(equals(steps('basics').rpStorage.registrationState, 'Registered'))), and(not(empty(steps('basics').rpResources.registrationState)), not(equals(steps('basics').rpResources.registrationState, 'Registered'))), and(not(empty(steps('basics').rpInsights.registrationState)), not(equals(steps('basics').rpInsights.registrationState, 'Registered'))), and(not(empty(steps('basics').rpPolicyInsights.registrationState)), not(equals(steps('basics').rpPolicyInsights.registrationState, 'Registered'))), and(not(empty(steps('basics').rpEventHub.registrationState)), not(equals(steps('basics').rpEventHub.registrationState, 'Registered'))))))]",
               "options": {
-                "style": "Info",
-                "text": "All resource providers enabled - every required resource provider is registered in the deployment subscription."
+                "style": "None",
+                "text": "✅ All resource providers enabled - every required resource provider is registered in the deployment subscription."
               }
             },
             {
@@ -173,8 +173,8 @@
               "type": "Microsoft.Common.InfoBox",
               "visible": "[contains(coalesce(steps('basics').gaCheck, parse('{}')), 'value')]",
               "options": {
-                "style": "Info",
-                "text": "Global Administrator confirmed (able to read Entra ID diagnostic settings)."
+                "style": "None",
+                "text": "✅ Global Administrator confirmed (able to read Entra ID diagnostic settings)."
               }
             },
             {
@@ -209,8 +209,8 @@
               "type": "Microsoft.Common.InfoBox",
               "visible": "[and(not(empty(steps('basics').permDeploySub.value)), not(empty(filter(steps('basics').permDeploySub.value, (p) => and(contains(p.actions, 'Microsoft.Authorization/*'), contains(p.actions, '*/read'))))))]",
               "options": {
-                "style": "Info",
-                "text": "User Access Administrator confirmed on the deployment subscription."
+                "style": "None",
+                "text": "✅ User Access Administrator confirmed on the deployment subscription."
               }
             },
             {
@@ -228,8 +228,8 @@
               "type": "Microsoft.Common.InfoBox",
               "visible": "[and(not(empty(steps('basics').permDeploySub.value)), not(empty(filter(steps('basics').permDeploySub.value, (p) => and(contains(p.actions, '*'), empty(p.notActions))))))]",
               "options": {
-                "style": "Info",
-                "text": "Owner confirmed on the deployment subscription."
+                "style": "None",
+                "text": "✅ Owner confirmed on the deployment subscription."
               }
             },
             {
@@ -247,8 +247,8 @@
               "type": "Microsoft.Common.InfoBox",
               "visible": "[and(not(empty(steps('basics').permDeploySub.value)), not(empty(filter(steps('basics').permDeploySub.value, (p) => contains(p.actions, 'Microsoft.Resources/deploymentStacks/*')))))]",
               "options": {
-                "style": "Info",
-                "text": "Azure Deployment Stack Owner confirmed on the deployment subscription."
+                "style": "None",
+                "text": "✅ Azure Deployment Stack Owner confirmed on the deployment subscription."
               }
             },
             {
@@ -259,6 +259,42 @@
                 "style": "Error",
                 "text": "Missing Azure Deployment Stack Owner - assign the Azure Deployment Stack Owner role on the deployment subscription (Owner alone is not enough), then sign out of the Azure portal, sign back in and reopen this form (role changes can take up to 10 minutes to apply).",
                 "uri": "https://learn.microsoft.com/azure/azure-resource-manager/bicep/deployment-stacks#deployment-stack-permissions"
+              }
+            },
+            {
+              "name": "storagePolicyApi",
+              "type": "Microsoft.Solutions.ArmApiControl",
+              "request": {
+                "method": "GET",
+                "path": "[concat('/subscriptions/', steps('basics').resourceScope.subscription.subscriptionId, '/providers/Microsoft.Authorization/policyAssignments?api-version=2023-04-01&$filter=atScope()')]"
+              }
+            },
+            {
+              "name": "storagePolicyPending",
+              "type": "Microsoft.Common.InfoBox",
+              "visible": "[not(contains(coalesce(steps('basics').storagePolicyApi, parse('{}')), 'value'))]",
+              "options": {
+                "style": "Info",
+                "text": "Checking Azure Policy assignments on the deployment subscription for storage policies that can block the deployment... If this message does not clear, your account could not read policy assignments (this check doesn't block)."
+              }
+            },
+            {
+              "name": "storagePolicyNone",
+              "type": "Microsoft.Common.InfoBox",
+              "visible": "[and(contains(coalesce(steps('basics').storagePolicyApi, parse('{}')), 'value'), empty(filter(coalesce(steps('basics').storagePolicyApi.value, parse('[]')), (a) => contains(parse('[\"34c877ad-507e-4c82-993e-3452a6e0ad3c\",\"f0308946-498a-43fd-8d44-a75b47cd2aef\",\"4fa4b6c0-31ca-4c0d-b10d-24b96f62a751\"]'), last(split(a.properties.policyDefinitionId, '/'))))))]",
+              "options": {
+                "style": "None",
+                "text": "✅ No storage network-access or public-access policy is assigned to the deployment subscription or above it."
+              }
+            },
+            {
+              "name": "storagePolicyFound",
+              "type": "Microsoft.Common.InfoBox",
+              "visible": "[and(contains(coalesce(steps('basics').storagePolicyApi, parse('{}')), 'value'), not(empty(filter(coalesce(steps('basics').storagePolicyApi.value, parse('[]')), (a) => contains(parse('[\"34c877ad-507e-4c82-993e-3452a6e0ad3c\",\"f0308946-498a-43fd-8d44-a75b47cd2aef\",\"4fa4b6c0-31ca-4c0d-b10d-24b96f62a751\"]'), last(split(a.properties.policyDefinitionId, '/')))))))]",
+              "options": {
+                "style": "Warning",
+                "text": "[concat('Storage policy assigned: ', coalesce(first(filter(coalesce(steps('basics').storagePolicyApi.value, parse('[]')), (a) => contains(parse('[\"34c877ad-507e-4c82-993e-3452a6e0ad3c\",\"f0308946-498a-43fd-8d44-a75b47cd2aef\",\"4fa4b6c0-31ca-4c0d-b10d-24b96f62a751\"]'), last(split(a.properties.policyDefinitionId, '/'))))).properties.displayName, first(filter(coalesce(steps('basics').storagePolicyApi.value, parse('[]')), (a) => contains(parse('[\"34c877ad-507e-4c82-993e-3452a6e0ad3c\",\"f0308946-498a-43fd-8d44-a75b47cd2aef\",\"4fa4b6c0-31ca-4c0d-b10d-24b96f62a751\"]'), last(split(a.properties.policyDefinitionId, '/'))))).name), if(greater(length(filter(coalesce(steps('basics').storagePolicyApi.value, parse('[]')), (a) => contains(parse('[\"34c877ad-507e-4c82-993e-3452a6e0ad3c\",\"f0308946-498a-43fd-8d44-a75b47cd2aef\",\"4fa4b6c0-31ca-4c0d-b10d-24b96f62a751\"]'), last(split(a.properties.policyDefinitionId, '/'))))), 1), concat(' (and ', string(sub(length(filter(coalesce(steps('basics').storagePolicyApi.value, parse('[]')), (a) => contains(parse('[\"34c877ad-507e-4c82-993e-3452a6e0ad3c\",\"f0308946-498a-43fd-8d44-a75b47cd2aef\",\"4fa4b6c0-31ca-4c0d-b10d-24b96f62a751\"]'), last(split(a.properties.policyDefinitionId, '/'))))), 1)), ' more)'), ''), '. If it is set to Deny, it blocks the storage account the CrowdStrike deployment scripts create, and the deployment fails. To avoid that, use an existing storage account for the deployment scripts (Advanced tab), or create a policy exemption for the CrowdStrike resource group before deploying. This check does not block Next.')]",
+                "uri": "https://learn.microsoft.com/azure/governance/policy/concepts/exemption-structure"
               }
             },
             {
@@ -349,8 +385,8 @@
               "type": "Microsoft.Common.InfoBox",
               "visible": "[equals(length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(steps('basics').resourceScope.subscription.subscriptionId))))), 0)]",
               "options": {
-                "style": "Info",
-                "text": "No additional subscriptions listed - only the deployment subscription will be monitored (Owner was checked on the Prerequisites tab)."
+                "style": "None",
+                "text": "✅ No additional subscriptions listed - only the deployment subscription will be monitored (Owner was checked on the Prerequisites tab)."
               }
             },
             {
@@ -367,8 +403,8 @@
               "type": "Microsoft.Common.InfoBox",
               "visible": "[and(greater(length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(steps('basics').resourceScope.subscription.subscriptionId))))), 0), equals(length(coalesce(steps('scope').permMonitored.responses, parse('[]'))), length(filter(filter(split(toLower(replace(coalesce(steps('scope').subscriptionIds, ''), ' ', '')), ','), (s) => not(empty(s))), (s) => not(equals(s, toLower(steps('basics').resourceScope.subscription.subscriptionId)))))), empty(map(filter(coalesce(steps('scope').permMonitored.responses, parse('[]')), (r) => not(and(equals(r.httpStatusCode, 200), contains(string(r.content.value), '\"actions\":[\"*\"],\"dataActions\":[],\"notActions\":[]')))), (r) => r.name)))]",
               "options": {
-                "style": "Info",
-                "text": "Owner confirmed on every subscription to monitor."
+                "style": "None",
+                "text": "✅ Owner confirmed on every subscription to monitor."
               }
             },
             {
@@ -931,8 +967,8 @@
                   "type": "Microsoft.Common.InfoBox",
                   "visible": "[and(and(steps('features').enableRealTimeVisibility, steps('advanced').useExistingScriptStorage), not(empty(coalesce(steps('advanced').scriptStorage.storageAccount.id, ''))), not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, ''))), startsWith(toLower(coalesce(steps('advanced').scriptStorage.storageAccount.id, '')), toLower(concat('/subscriptions/', steps('basics').resourceScope.subscription.subscriptionId, '/'))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(steps('advanced').scriptStorage.storageApi.properties.allowSharedKeyAccess, false))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(coalesce(steps('advanced').scriptStorage.storageApi.properties.networkAcls.defaultAction, 'Allow'), 'Deny'))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), or(and(startsWith(coalesce(steps('advanced').scriptStorage.storageApi.sku.name, ''), 'Premium_'), equals(coalesce(steps('advanced').scriptStorage.storageApi.kind, ''), 'FileStorage')), and(contains(parse('[\"Standard_LRS\",\"Standard_GRS\",\"Standard_RAGRS\"]'), coalesce(steps('advanced').scriptStorage.storageApi.sku.name, '')), contains(parse('[\"Storage\",\"StorageV2\"]'), coalesce(steps('advanced').scriptStorage.storageApi.kind, ''))), and(contains(parse('[\"Standard_ZRS\",\"Standard_GZRS\",\"Standard_RAGZRS\"]'), coalesce(steps('advanced').scriptStorage.storageApi.sku.name, '')), equals(coalesce(steps('advanced').scriptStorage.storageApi.kind, ''), 'StorageV2')))), or(not(not(empty(coalesce(steps('advanced').scriptStorage.storageApi.name, '')))), not(equals(coalesce(steps('advanced').scriptStorage.storageApi.properties.publicNetworkAccess, 'Enabled'), 'Disabled')), not(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')))), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), startsWith(toLower(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), toLower(concat('/subscriptions/', steps('basics').resourceScope.subscription.subscriptionId, '/')))), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), contains(toLower(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), '/subnets/')), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), not(empty(coalesce(steps('advanced').scriptStorage.subnetApi.name, '')))), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), not(not(empty(coalesce(steps('advanced').scriptStorage.subnetApi.name, '')))), contains(map(coalesce(steps('advanced').scriptStorage.subnetApi.properties.delegations, parse('[]')), (d) => d.properties.serviceName), 'Microsoft.ContainerInstance/containerGroups')), or(empty(replace(coalesce(steps('advanced').scriptStorage.subnetId, ''), ' ', '')), not(not(empty(coalesce(steps('advanced').scriptStorage.vnetApi.location, '')))), equals(toLower(steps('advanced').scriptStorage.vnetApi.location), toLower(steps('basics').resourceScope.location.name))))]",
                   "options": {
-                    "style": "Info",
-                    "text": "Storage account meets the deployment script requirements the form can check."
+                    "style": "None",
+                    "text": "✅ Storage account meets the deployment script requirements the form can check."
                   }
                 }
               ]

@@ -262,7 +262,7 @@ def subscription_form():
             },
         }),
         f.edited("intro", text="Prerequisite check for CrowdStrike Falcon Cloud Security. Select the subscription and region the deployment runs in; this page then verifies the required resource providers and your permissions. You cannot continue until every check passes, unless you skip the checks at the bottom of this page."),
-    ] + dumps(rp_elems + ga_elems + perm_elems + checks.skip_checks())
+    ] + dumps(rp_elems + ga_elems + perm_elems + checks.storage_policy_info("basics", sub, where) + checks.skip_checks())
 
     scope = principal_id(f) + [
         f.edited("subscriptionIds", validations=[
@@ -343,7 +343,8 @@ def management_group_form():
                     (infra_perm["owner"], "Owner is required on the infrastructure subscription (or is still being checked). See the Owner message below."),
                 ]]},
         }),
-    ] + dumps(ga_elems + mg_perm_elems + rp_elems + infra_perm_elems + checks.skip_checks())
+    ] + dumps(ga_elems + mg_perm_elems + rp_elems + infra_perm_elems
+              + checks.storage_policy_info("basics", infra, "infrastructure subscription") + checks.skip_checks())
 
     # Subscriptions outside the selected management group can be added (the engine's
     # subscriptionIds), with the same Owner check as the subscription form.

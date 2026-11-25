@@ -320,8 +320,11 @@ Azure Container Instances requirements; set them up first:
 * a **NAT gateway** on the subnet: Microsoft lists it as the only supported outbound path for a
   container group in a virtual network, and the script needs outbound access (container image,
   Azure Resource Manager, the Falcon API);
-* a `Microsoft.Storage` **service endpoint** on the subnet (or a private endpoint with its
-  `privatelink.file.core.windows.net` DNS zone linked to the virtual network);
+* a way to reach the storage account from the subnet. With public network access **Disabled**
+  (the usual reason to use this option) that's a **private endpoint** for the `file` sub-resource
+  plus the `privatelink.file.core.windows.net` private DNS zone linked to the virtual network
+  (Microsoft: *Run Bicep deployment script privately over a private endpoint*). A `Microsoft.Storage`
+  service endpoint only helps while public access is enabled;
 * a subnet of at least **/24** (Microsoft: smaller subnets can fail with "subnet full").
 
 **Without a subnet**, the wrapper looks up the storage account key (`listKeys`) during deployment.
@@ -332,11 +335,18 @@ Use a subnet, or rotate the key after deploying (`az storage account keys renew 
 **File shares.** Each run creates a file share in the storage account. The scripts use a 24-hour
 retention (`cleanupPreference: OnExpiration`), so shares stay for about a day after each deployment.
 
-**Tested.** CrowdStrike's own scope-lookup module (`cs-deployment-scope-mg.bicep`, which runs a
-deployment script and calls no Falcon API) ran successfully against an existing storage account on
-both paths in a lab tenant: with a key, and with a delegated subnet (with a `Microsoft.Storage`
-service endpoint) and no key. The share was created in the chosen account and no storage account
-was auto-created. The full registration and the form in the portal haven't been run with this option.
+**Tested (lab tenant, 2026-11-25).** Both forms were filled in the portal, and the deployment
+parameters were computed from each form's own outputs (they matched the portal's Review + create
+summary), then deployed:
+
+* **Subscription, key path:** `cs-subscription-stack` succeeded. The Falcon callback script used the
+  chosen storage account and created its file share there; no storage account was auto-created.
+* **Management group (Tenant Root Group), private path:** `cs-managementgroup-stack` succeeded. Both
+  scripts ran in the delegated subnet against a storage account with public network access disabled
+  (private endpoint for `file`, `privatelink.file.core.windows.net` zone, NAT gateway), with no key.
+
+Only West US was tested. In an automated browser the portal's **Create** button never enabled (for
+`main`'s form too); the deployments were run from the CLI with the same parameters.
 
 ## Repository layout
 

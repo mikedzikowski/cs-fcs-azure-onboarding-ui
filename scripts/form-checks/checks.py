@@ -266,7 +266,10 @@ def falcon_ip_output(step, visible):
 #     when the account isn't reachable from a public or service-endpoint-allowed network path);
 #   * a subnet in the same subscription, delegated to Microsoft.ContainerInstance/containerGroups,
 #     in the deployment region. Container groups in a VNet need a NAT gateway for outbound traffic
-#     and a Microsoft.Storage service endpoint; the form can't verify those, the info box says so.
+#     and a way to reach the storage account: a Microsoft.Storage service endpoint while public access
+#     is enabled, or (public access Disabled) a private endpoint for `file` with the
+#     privatelink.file.core.windows.net zone linked (deployment-script-vnet-private-endpoint). The
+#     form can't verify those; the info box says so.
 SCRIPT_STORAGE_DOCS = "https://github.com/CrowdStrike/azure-bicep-cloud-registration#deployment-fails-because-the-auto-created-deployment-script-storage-account-violates-policy"
 ACI_DELEGATION = "Microsoft.ContainerInstance/containerGroups"
 
@@ -337,7 +340,8 @@ def script_storage_section(step, infra, location, enabled):
                   "Use a storage account in the infrastructure subscription with shared key access enabled and no firewall rules. "
                   "If public network access is disabled on it, also enter a subnet in the deployment region delegated to "
                   f"{ACI_DELEGATION}, so the script runs in that virtual network. That subnet needs a NAT gateway for outbound "
-                  "traffic and a Microsoft.Storage service endpoint (Azure Container Instances requirements the form can't check)."}},
+                  "traffic. With public network access disabled, the storage account also needs a private endpoint for file in that "
+                  "virtual network and the privatelink.file.core.windows.net DNS zone linked to it (requirements the form can't check)."}},
              {"name": "storageAccount", "type": "Microsoft.Solutions.ResourceSelector", "label": "Storage account",
               "resourceType": "Microsoft.Storage/storageAccounts",
               "toolTip": "Existing storage account in the infrastructure subscription.",

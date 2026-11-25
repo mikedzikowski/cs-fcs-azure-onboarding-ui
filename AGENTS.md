@@ -110,9 +110,17 @@ Publish a new version number for each change so links to earlier versions keep w
   * ResourceSelector filters with `scope: {subscriptionId}` (schema), not createUiDefinition's
     `options.filter`. The existing-Event-Hub selector in `ui/base` still uses `options.filter`; it
     deploys, so the portal accepts it, but it isn't in the schema.
-  * Verified: CrowdStrike's `cs-deployment-scope-mg.bicep` ran its script on an existing storage
-    account on both paths (key; delegated subnet + Microsoft.Storage service endpoint, no key). The
-    form in the portal and a full registration with this option are not yet tested.
+  * Verified 2026-11-25 (lab, West US): both forms in the portal (every storage/subnet rule, pass and
+    fail), then full registrations with parameters computed from the served forms' outputs:
+    subscription key path, and management group private path (public access disabled, private
+    endpoint for `file` + `privatelink.file.core.windows.net`, delegated subnet with a NAT gateway,
+    no key). The scripts used the chosen storage account; nothing was auto-created.
+  * With public access disabled a `Microsoft.Storage` service endpoint is not enough; the subnet
+    needs a private endpoint + DNS zone (Microsoft: "Run Bicep deployment script privately over a
+    private endpoint").
+  * In an automated (chrome-devtools) browser, Review + create never finished final validation and
+    Create stayed disabled, for `main`'s form too. Validate/deploy from the CLI with parameters
+    evaluated from the form's `view.outputs` instead; don't conclude the form is broken.
 * Gate optional lookups with ArmApiControl `condition` (e.g. the existing-Event-Hub lookups), or a
   failing call with empty inputs keeps **Create** disabled.
 * DropDown `defaultValue` must be a **label**, not a value (e.g. `"Production"`, not `"prod"`).

@@ -813,7 +813,7 @@
                   "options": {
                     "style": "Info",
                     "uri": "https://github.com/CrowdStrike/azure-bicep-cloud-registration#deployment-fails-because-the-auto-created-deployment-script-storage-account-violates-policy",
-                    "text": "Use a storage account in the infrastructure subscription with shared key access enabled and no firewall rules. If public network access is disabled on it, also enter a subnet in the deployment region delegated to Microsoft.ContainerInstance/containerGroups, so the script runs in that virtual network. That subnet needs a NAT gateway for outbound traffic and a Microsoft.Storage service endpoint (Azure Container Instances requirements the form can't check)."
+                    "text": "Use a storage account in the infrastructure subscription with shared key access enabled and no firewall rules. If public network access is disabled on it, also enter a subnet in the deployment region delegated to Microsoft.ContainerInstance/containerGroups, so the script runs in that virtual network. That subnet needs a NAT gateway for outbound traffic. With public network access disabled, the storage account also needs a private endpoint for file in that virtual network and the privatelink.file.core.windows.net DNS zone linked to it (requirements the form can't check)."
                   }
                 },
                 {
